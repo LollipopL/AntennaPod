@@ -75,7 +75,7 @@
   <string name="browse_gpoddernet_label">Navegar gpodder.net</string>
   <!--Actions on feeds-->
   <string name="mark_all_read_label">Marcar todo como leído</string>
-  <string name="mark_all_seen_label">Marcar todos como visto</string>
+  <string name="remove_all_new_flags_label">Marcar todos como visto</string>
   <string name="show_info_label">Información del programa</string>
   <string name="remove_feed_label">Eliminar podcast</string>
   <string name="share_link_label">Compartir el enlace de la web</string>
@@ -193,7 +193,6 @@
   <string name="deselect_all_label">Deseleccionar todo</string>
   <string name="opml_export_label">Exportar a OPML</string>
   <string name="export_error_label">Error en la exportación</string>
-  <string name="opml_export_success_sum">El archivo OPML se ha escrito en:\u0020</string>
   <!--Sleep timer-->
   <string name="set_sleeptimer_label">Establecer un temporizador</string>
   <string name="disable_sleeptimer_label">Desactivar el temporizador</string>
@@ -229,4 +228,5 @@
   <!--Database import/export-->
   <!--Casting-->
   <!--<string name="cast_failed_to_connect">Could not connect to the device</string>-->
+  <!--Notification channels-->
 </resources>

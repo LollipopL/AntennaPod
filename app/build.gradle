@@ -1,50 +1,40 @@
+plugins {
+    id('com.android.application')
+    id('com.getkeepsafe.dexcount')
+    id('com.github.triplet.play') version '2.3.0' apply false
+}
+
 import org.apache.tools.ant.filters.ReplaceTokens
-
-apply plugin: "com.android.application"
-apply plugin: 'com.github.triplet.play'
-apply plugin: 'com.getkeepsafe.dexcount'
-
-repositories {
-    maven { url "https://jitpack.io" }
-    mavenCentral()
-}
-
-buildscript {
-    repositories {
-       jcenter()
-    }
-    dependencies {
-        classpath 'com.getkeepsafe.dexcount:dexcount-gradle-plugin:0.8.2'
-    }
-}
-
-def getMyVersionName() {
-    def parsedManifestXml = (new XmlSlurper())
-            .parse("${projectDir}/src/main/AndroidManifest.xml")
-            .declareNamespace(android: "http://schemas.android.com/apk/res/android")
-    return parsedManifestXml."@android:versionName"
-}
-
-def getMyVersionCode() {
-    def parsedManifestXml = (new XmlSlurper())
-            .parse("${projectDir}/src/main/AndroidManifest.xml")
-            .declareNamespace(android: "http://schemas.android.com/apk/res/android")
-    return parsedManifestXml."@android:versionCode".toInteger()
-}
 
 android {
     compileSdkVersion rootProject.ext.compileSdkVersion
-    buildToolsVersion rootProject.ext.buildToolsVersion
 
     defaultConfig {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        multiDexEnabled true
-        versionCode getMyVersionCode()
-        versionName "${getMyVersionName()}"
+        multiDexEnabled false
+        vectorDrawables.useSupportLibrary true
+        // Version code schema:
+        // "1.2.3-SNAPSHOT" -> 1020300
+        // "1.2.3-RC4"      -> 1020304
+        // "1.2.3"          -> 1020395
+        versionCode 1080195
+        versionName "1.8.1"
         testApplicationId "de.test.antennapod"
-        testInstrumentationRunner "de.test.antennapod.AntennaPodTestRunner"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         generatedDensities = []
+
+        def commit = "Unknown commit"
+        try {
+            commit = "git rev-parse --short HEAD".execute().text.trim()
+        } catch (Exception ignore) { }
+        buildConfigField "String", "COMMIT_HASH", ('"' + commit + '"')
+
+        javaCompileOptions {
+            annotationProcessorOptions {
+                arguments = [ eventBusIndex : 'de.danoeh.antennapod.ApEventBusIndex' ]
+            }
+        }
     }
 
     signingConfigs {
@@ -74,24 +64,31 @@ android {
 
     buildTypes {
         def STRING = "String"
-        def FLATTR_APP_KEY = "FLATTR_APP_KEY"
-        def FLATTR_APP_SECRET = "FLATTR_APP_SECRET"
-        def mFlattrAppKey = (project.hasProperty("flattrAppKey")) ? flattrAppKey : "\"\""
-        def mFlattrAppSecret = (project.hasProperty("flattrAppSecret")) ? flattrAppSecret : "\"\""
 
         debug {
             applicationIdSuffix ".debug"
             resValue "string", "provider_authority", "de.danoeh.antennapod.debug.provider"
-            buildConfigField STRING, FLATTR_APP_KEY, mFlattrAppKey
-            buildConfigField STRING, FLATTR_APP_SECRET, mFlattrAppSecret
+
+            // debug build has method count over 64k single-dex threshold. 
+            // For building debug build to use on Android < 21 (pre-Android 5) devices, 
+            // you need to manually change class
+            // de.danoeh.antennapod.PodcastApp to extend MultiDexApplication . 
+            // See Issue #2813
+            multiDexEnabled true
+            
+            dexcount {
+                if (project.hasProperty("enableDexcountInDebug")) {
+                    runOnEachPackage enableDexcountInDebug.toBoolean()
+                } else { // default to not running dexcount
+                    runOnEachPackage false                 
+                }
+            }
         }
         release {
             resValue "string", "provider_authority", "de.danoeh.antennapod.provider"
             minifyEnabled true
-            proguardFile "proguard.cfg"
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), "proguard.cfg"
             signingConfig signingConfigs.releaseConfig
-            buildConfigField STRING, FLATTR_APP_KEY, mFlattrAppKey
-            buildConfigField STRING, FLATTR_APP_SECRET, mFlattrAppSecret
         }
     }
 
@@ -111,6 +108,10 @@ android {
 
     aaptOptions {
         additionalParameters "--no-version-vectors"
+    }
+
+    testOptions {
+        animationsDisabled = true
     }
 
     flavorDimensions "market"
@@ -136,82 +137,63 @@ dependencies {
     } else {
         System.out.println("app: free build hack, skipping some dependencies")
     }
-    implementation "com.android.support:support-v4:$supportVersion"
-    implementation "com.android.support:appcompat-v7:$supportVersion"
-    implementation "com.android.support:design:$supportVersion"
-    implementation "com.android.support:gridlayout-v7:$supportVersion"
-    implementation "com.android.support:percent:$supportVersion"
-    implementation "com.android.support:recyclerview-v7:$supportVersion"
+    implementation "androidx.appcompat:appcompat:1.1.0"
+    implementation "androidx.preference:preference:1.1.0"
+    implementation "androidx.gridlayout:gridlayout:1.0.0"
+    implementation "androidx.recyclerview:recyclerview:1.0.0"
+    implementation "androidx.media:media:1.1.0"
+    implementation "com.google.android.material:material:1.0.0"
+    annotationProcessor "androidx.annotation:annotation:1.1.0"
+    compileOnly "com.google.android.wearable:wearable:$wearableSupportVersion"
     implementation "org.apache.commons:commons-lang3:$commonslangVersion"
-    implementation("org.shredzone.flattr4j:flattr4j-core:$flattr4jVersion") {
-        exclude group: "org.json", module: "json"
-    }
     implementation "commons-io:commons-io:$commonsioVersion"
     implementation "org.jsoup:jsoup:$jsoupVersion"
     implementation "com.github.bumptech.glide:glide:$glideVersion"
+    annotationProcessor "com.github.bumptech.glide:compiler:$glideVersion"
     implementation "com.squareup.okhttp3:okhttp:$okhttpVersion"
     implementation "com.squareup.okhttp3:okhttp-urlconnection:$okhttpVersion"
     implementation "com.squareup.okio:okio:$okioVersion"
-    implementation "de.greenrobot:eventbus:$eventbusVersion"
-    implementation "io.reactivex:rxandroid:$rxAndroidVersion"
-    implementation "io.reactivex:rxjava:$rxJavaVersion"
-    // And ProGuard rules for RxJava!
-    implementation "com.artemzin.rxjava:proguard-rules:$rxJavaRulesVersion"
+    implementation "org.greenrobot:eventbus:$eventbusVersion"
+    annotationProcessor "org.greenrobot:eventbus-annotation-processor:$eventbusVersion"
+    implementation "io.reactivex.rxjava2:rxandroid:$rxAndroidVersion"
+    implementation "io.reactivex.rxjava2:rxjava:$rxJavaVersion"
+
     implementation "com.joanzapata.iconify:android-iconify-fontawesome:$iconifyVersion"
     implementation "com.joanzapata.iconify:android-iconify-material:$iconifyVersion"
-    implementation("com.afollestad.material-dialogs:commons:$materialDialogsVersion") {
-        transitive = true
-    }
     implementation "com.yqritc:recyclerview-flexibledivider:$recyclerviewFlexibledividerVersion"
-    implementation("com.githang:viewpagerindicator:2.5.1@aar") {
-        exclude module: "support-v4"
-    }
-
     implementation "com.github.shts:TriangleLabelView:$triangleLabelViewVersion"
-
+    implementation 'com.leinardi.android:speed-dial:3.0.0'
     implementation "com.github.AntennaPod:AntennaPod-AudioPlayer:$audioPlayerVersion"
+    implementation 'com.github.mfietz:fyydlin:v0.4.2'
+    implementation 'com.github.ByteHamster:SearchPreference:v2.0.0'
 
-    implementation 'com.github.mfietz:fyydlin:v0.3'
-
+    androidTestImplementation "org.awaitility:awaitility:$awaitilityVersion"
+    androidTestImplementation 'com.nanohttpd:nanohttpd-webserver:2.1.1'
     androidTestImplementation "com.jayway.android.robotium:robotium-solo:$robotiumSoloVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$espressoVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-contrib:$espressoVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-intents:$espressoVersion"
+    androidTestImplementation 'androidx.test:runner:1.2.0'
+    androidTestImplementation 'androidx.test:rules:1.2.0'
 }
 
-play {
-    serviceAccountEmail = '522080222319-compute@developer.gserviceaccount.com'
-    pk12File = file('../serviceaccount-c3d7d0f61387.p12')
-}
-
-// about.html is templatized so that we can automatically insert
-// our version string in to it at build time.
-task filterAbout {
-    inputs.files files(["src/main/templates/about.html",
-                        "src/main/AndroidManifest.xml"])
-    outputs.file "src/main/assets/about.html"
-} doLast {
-    copy {
-        from "src/main/templates/about.html"
-        into "src/main/assets"
-        filter(ReplaceTokens, tokens: [versionname: android.defaultConfig.versionName,
-                                       commit     : "git rev-parse --short HEAD".execute().text,
-                                       year       : new Date().format('yyyy')])
+if (project.hasProperty("antennaPodServiceAccountEmail")) {
+    apply plugin: 'com.github.triplet.play'
+    play {
+        track = 'alpha'
+        serviceAccountEmail = antennaPodServiceAccountEmail
+        serviceAccountCredentials = file(antennaPodPk12File)
     }
 }
 
-task copyTextFiles(type: Copy) {
-    from "../CONTRIBUTORS"
+task copyLicense(type: Copy) {
     from "../LICENSE"
     into "src/main/assets/"
     rename { String fileName ->
         fileName + ".txt"
     }
+    outputs.upToDateWhen { false }
 }
 
-preBuild.dependsOn filterAbout, copyTextFiles
+preBuild.dependsOn copyLicense
 
-allprojects {
-    gradle.projectsEvaluated {
-        tasks.withType(JavaCompile) {
-            options.compilerArgs << "-Xlint" << "-Xlint:-deprecation" << "-Xlint:-serial"
-        }
-    }
-}

@@ -2,8 +2,8 @@ package de.danoeh.antennapod.core.service.playback;
 
 import android.content.Context;
 import android.net.wifi.WifiManager;
-import android.support.annotation.NonNull;
-import android.support.annotation.StringRes;
+import androidx.annotation.NonNull;
+import androidx.annotation.StringRes;
 import android.util.Log;
 import android.util.Pair;
 import android.view.SurfaceHolder;
@@ -148,10 +148,12 @@ public abstract class PlaybackServiceMediaPlayer {
     public abstract boolean canSetSpeed();
 
     /**
-     * Sets the playback speed.
+     * Sets the playback parameters.
+     * - Speed
+     * - SkipSilence (ExoPlayer only)
      * This method is executed on an internal executor service.
      */
-    public abstract void setSpeed(float speed);
+    public abstract void  setPlaybackParams(final float speed, final boolean skipSilence);
 
     /**
      * Returns the current playback speed. If the playback speed could not be retrieved, 1 is returned.

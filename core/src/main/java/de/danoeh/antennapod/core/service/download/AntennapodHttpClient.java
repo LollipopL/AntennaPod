@@ -1,10 +1,11 @@
 package de.danoeh.antennapod.core.service.download;
 
 import android.os.Build;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 import android.text.TextUtils;
 import android.util.Log;
 
+import de.danoeh.antennapod.core.service.BasicAuthorizationInterceptor;
 import java.io.IOException;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
@@ -16,7 +17,9 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.SSLContext;
@@ -28,6 +31,8 @@ import javax.net.ssl.X509TrustManager;
 
 import de.danoeh.antennapod.core.preferences.UserPreferences;
 import de.danoeh.antennapod.core.storage.DBWriter;
+import okhttp3.CipherSuite;
+import okhttp3.ConnectionSpec;
 import okhttp3.Credentials;
 import okhttp3.HttpUrl;
 import okhttp3.JavaNetCookieJar;
@@ -40,9 +45,12 @@ import okhttp3.internal.http.StatusLine;
  * Provides access to a HttpClient singleton.
  */
 public class AntennapodHttpClient {
+
+    private AntennapodHttpClient(){}
+
     private static final String TAG = "AntennapodHttpClient";
 
-    private static final int CONNECTION_TIMEOUT = 30000;
+    private static final int CONNECTION_TIMEOUT = 10000;
     private static final int READ_TIMEOUT = 30000;
 
     private static final int MAX_CONNECTIONS = 8;
@@ -105,6 +113,7 @@ public class AntennapodHttpClient {
             }
             return response;
         });
+        builder.interceptors().add(new BasicAuthorizationInterceptor());
 
         // set cookie handler
         CookieManager cm = new CookieManager();
@@ -135,9 +144,24 @@ public class AntennapodHttpClient {
                 });
             }
         }
-        if(16 <= Build.VERSION.SDK_INT && Build.VERSION.SDK_INT < 21) {
+        if (Build.VERSION.SDK_INT < 21) {
             builder.sslSocketFactory(new CustomSslSocketFactory(), trustManager());
         }
+
+        if (Build.VERSION.SDK_INT < 21) {
+            // workaround for Android 4.x for certain web sites.
+            // see: https://github.com/square/okhttp/issues/4053#issuecomment-402579554
+            List<CipherSuite> cipherSuites = new ArrayList<>();
+            cipherSuites.addAll(ConnectionSpec.MODERN_TLS.cipherSuites());
+            cipherSuites.add(CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA);
+            cipherSuites.add(CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA);
+
+            ConnectionSpec legacyTls = new ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
+                    .cipherSuites(cipherSuites.toArray(new CipherSuite[0]))
+                    .build();
+            builder.connectionSpecs(Arrays.asList(legacyTls, ConnectionSpec.CLEARTEXT));
+        }
+
         return builder;
     }
 

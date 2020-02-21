@@ -1,10 +1,8 @@
 package de.danoeh.antennapod.fragment;
 
-import android.content.Context;
-import android.content.res.TypedArray;
-import android.graphics.Color;
 import android.os.Bundle;
-import android.support.v4.app.ListFragment;
+import androidx.annotation.NonNull;
+import androidx.fragment.app.ListFragment;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -12,25 +10,29 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.ListView;
 
-import com.joanzapata.iconify.IconDrawable;
-import com.joanzapata.iconify.fonts.FontAwesomeIcons;
-
+import java.util.ArrayList;
 import java.util.List;
 
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.adapter.DownloadedEpisodesListAdapter;
-import de.danoeh.antennapod.core.feed.EventDistributor;
+import de.danoeh.antennapod.core.event.DownloadLogEvent;
+import de.danoeh.antennapod.core.event.UnreadItemsUpdateEvent;
 import de.danoeh.antennapod.core.feed.FeedItem;
-import de.danoeh.antennapod.core.preferences.UserPreferences;
 import de.danoeh.antennapod.core.storage.DBReader;
 import de.danoeh.antennapod.core.storage.DBWriter;
 import de.danoeh.antennapod.core.util.FeedItemUtil;
 import de.danoeh.antennapod.dialog.EpisodesApplyActionFragment;
-import rx.Observable;
-import rx.Subscription;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.schedulers.Schedulers;
+import de.danoeh.antennapod.view.EmptyViewHandler;
+import io.reactivex.Observable;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.schedulers.Schedulers;
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+
+import static de.danoeh.antennapod.dialog.EpisodesApplyActionFragment.ACTION_ADD_TO_QUEUE;
+import static de.danoeh.antennapod.dialog.EpisodesApplyActionFragment.ACTION_DELETE;
 
 /**
  * Displays all running downloads and provides a button to delete them
@@ -39,78 +41,40 @@ public class CompletedDownloadsFragment extends ListFragment {
 
     private static final String TAG = CompletedDownloadsFragment.class.getSimpleName();
 
-    private static final int EVENTS = EventDistributor.DOWNLOAD_HANDLED |
-            EventDistributor.DOWNLOADLOG_UPDATE |
-            EventDistributor.UNREAD_ITEMS_UPDATE;
-
-    private List<FeedItem> items;
+    private List<FeedItem> items = new ArrayList<>();
     private DownloadedEpisodesListAdapter listAdapter;
-
-    private boolean viewCreated = false;
-
-    private Subscription subscription;
+    private Disposable disposable;
 
     @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+    public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
         setHasOptionsMenu(true);
-        loadItems();
+        addVerticalPadding();
+        addEmptyView();
+
+        listAdapter = new DownloadedEpisodesListAdapter((MainActivity) getActivity(), itemAccess);
+        setListAdapter(listAdapter);
+        setListShown(false);
+        EventBus.getDefault().register(this);
+    }
+
+    @Override
+    public void onDestroyView() {
+        EventBus.getDefault().unregister(this);
+        super.onDestroyView();
     }
 
     @Override
     public void onStart() {
         super.onStart();
-        EventDistributor.getInstance().register(contentUpdate);
+        loadItems();
     }
 
     @Override
     public void onStop() {
         super.onStop();
-        EventDistributor.getInstance().unregister(contentUpdate);
-        if(subscription != null) {
-            subscription.unsubscribe();
-        }
-    }
-
-    @Override
-    public void onDetach() {
-        super.onDetach();
-        if(subscription != null) {
-            subscription.unsubscribe();
-        }
-    }
-
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        listAdapter = null;
-        viewCreated = false;
-        if(subscription != null) {
-            subscription.unsubscribe();
-        }
-    }
-
-    @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
-        if (viewCreated && items != null) {
-            onFragmentLoaded();
-        }
-    }
-
-    @Override
-    public void onViewCreated(View view, Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-
-        // add padding
-        final ListView lv = getListView();
-        lv.setClipToPadding(false);
-        final int vertPadding = getResources().getDimensionPixelSize(R.dimen.list_vertical_padding);
-        lv.setPadding(0, vertPadding, 0, vertPadding);
-
-        viewCreated = true;
-        if (items != null && getActivity() != null) {
-            onFragmentLoaded();
+        if (disposable != null) {
+            disposable.dispose();
         }
     }
 
@@ -119,64 +83,50 @@ public class CompletedDownloadsFragment extends ListFragment {
         super.onListItemClick(l, v, position, id);
         position -= l.getHeaderViewsCount();
         long[] ids = FeedItemUtil.getIds(items);
-        ((MainActivity) getActivity()).loadChildFragment(ItemFragment.newInstance(ids, position));
-    }
-
-    private void onFragmentLoaded() {
-        if (listAdapter == null) {
-            listAdapter = new DownloadedEpisodesListAdapter(getActivity(), itemAccess);
-            setListAdapter(listAdapter);
-        }
-        setListShown(true);
-        listAdapter.notifyDataSetChanged();
-        getActivity().supportInvalidateOptionsMenu();
+        ((MainActivity) requireActivity()).loadChildFragment(ItemPagerFragment.newInstance(ids, position));
     }
 
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
-        if(!isAdded()) {
-            return;
-        }
         super.onCreateOptionsMenu(menu, inflater);
-        if(items != null) {
-            inflater.inflate(R.menu.downloads_completed, menu);
-            MenuItem episodeActions = menu.findItem(R.id.episode_actions);
-            if(items.size() > 0) {
-                int[] attrs = {R.attr.action_bar_icon_color};
-                TypedArray ta = getActivity().obtainStyledAttributes(UserPreferences.getTheme(), attrs);
-                int textColor = ta.getColor(0, Color.GRAY);
-                ta.recycle();
-                episodeActions.setIcon(new IconDrawable(getActivity(),
-                        FontAwesomeIcons.fa_gears).color(textColor).actionBarSize());
-                episodeActions.setVisible(true);
-            } else {
-                episodeActions.setVisible(false);
-            }
-        }
+        inflater.inflate(R.menu.downloads_completed, menu);
+        menu.findItem(R.id.episode_actions).setVisible(items.size() > 0);
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.episode_actions:
-                EpisodesApplyActionFragment fragment = EpisodesApplyActionFragment
-                        .newInstance(items, EpisodesApplyActionFragment.ACTION_REMOVE);
-                ((MainActivity) getActivity()).loadChildFragment(fragment);
-                return true;
-            default:
-                return false;
+        if (item.getItemId() == R.id.episode_actions) {
+            ((MainActivity) requireActivity())
+                    .loadChildFragment(EpisodesApplyActionFragment.newInstance(items, ACTION_DELETE | ACTION_ADD_TO_QUEUE));
+            return true;
         }
+        return false;
+    }
+
+    private void addEmptyView() {
+        EmptyViewHandler emptyView = new EmptyViewHandler(getActivity());
+        emptyView.setIcon(R.attr.av_download);
+        emptyView.setTitle(R.string.no_comp_downloads_head_label);
+        emptyView.setMessage(R.string.no_comp_downloads_label);
+        emptyView.attachToListView(getListView());
+    }
+
+    private void addVerticalPadding() {
+        final ListView lv = getListView();
+        lv.setClipToPadding(false);
+        final int vertPadding = getResources().getDimensionPixelSize(R.dimen.list_vertical_padding);
+        lv.setPadding(0, vertPadding, 0, vertPadding);
     }
 
     private final DownloadedEpisodesListAdapter.ItemAccess itemAccess = new DownloadedEpisodesListAdapter.ItemAccess() {
         @Override
         public int getCount() {
-            return (items != null) ? items.size() : 0;
+            return items.size();
         }
 
         @Override
         public FeedItem getItem(int position) {
-            if (items != null && 0 <= position && position < items.size()) {
+            if (0 <= position && position < items.size()) {
                 return items.get(position);
             } else {
                 return null;
@@ -185,37 +135,36 @@ public class CompletedDownloadsFragment extends ListFragment {
 
         @Override
         public void onFeedItemSecondaryAction(FeedItem item) {
-            DBWriter.deleteFeedMediaOfItem(getActivity(), item.getMedia().getId());
+            DBWriter.deleteFeedMediaOfItem(requireActivity(), item.getMedia().getId());
         }
     };
 
-    private final EventDistributor.EventListener contentUpdate = new EventDistributor.EventListener() {
-        @Override
-        public void update(EventDistributor eventDistributor, Integer arg) {
-            if ((arg & EVENTS) != 0) {
-                loadItems();
-            }
-        }
-    };
-
-    private void loadItems() {
-        if(subscription != null) {
-            subscription.unsubscribe();
-        }
-        if (items == null && viewCreated) {
-            setListShown(false);
-        }
-        subscription = Observable.fromCallable(DBReader::getDownloadedItems)
-                .subscribeOn(Schedulers.newThread())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(result -> {
-                    if (result != null) {
-                        items = result;
-                        if (viewCreated && getActivity() != null) {
-                            onFragmentLoaded();
-                        }
-                    }
-                }, error ->  Log.e(TAG, Log.getStackTraceString(error)));
+    @Subscribe
+    public void onDownloadLogChanged(DownloadLogEvent event) {
+        loadItems();
     }
 
+    @Subscribe
+    public void onUnreadItemsChanged(UnreadItemsUpdateEvent event) {
+        loadItems();
+    }
+
+    private void loadItems() {
+        if (disposable != null) {
+            disposable.dispose();
+        }
+        disposable = Observable.fromCallable(DBReader::getDownloadedItems)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(result -> {
+                    items = result;
+                    onItemsLoaded();
+                }, error -> Log.e(TAG, Log.getStackTraceString(error)));
+    }
+
+    private void onItemsLoaded() {
+        setListShown(true);
+        listAdapter.notifyDataSetChanged();
+        requireActivity().invalidateOptionsMenu();
+    }
 }

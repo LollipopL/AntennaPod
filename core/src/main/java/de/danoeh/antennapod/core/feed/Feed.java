@@ -1,8 +1,9 @@
 package de.danoeh.antennapod.core.feed;
 
 import android.database.Cursor;
-import android.support.annotation.Nullable;
 import android.text.TextUtils;
+
+import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -11,15 +12,14 @@ import java.util.List;
 import de.danoeh.antennapod.core.asynctask.ImageResource;
 import de.danoeh.antennapod.core.storage.DBWriter;
 import de.danoeh.antennapod.core.storage.PodDBAdapter;
-import de.danoeh.antennapod.core.util.flattr.FlattrStatus;
-import de.danoeh.antennapod.core.util.flattr.FlattrThing;
+import de.danoeh.antennapod.core.util.SortOrder;
 
 /**
  * Data Object for a whole feed
  *
  * @author daniel
  */
-public class Feed extends FeedFile implements FlattrThing, ImageResource {
+public class Feed extends FeedFile implements ImageResource {
 
     public static final int FEEDFILETYPE_FEED = 0;
     public static final String TYPE_RSS2 = "rss";
@@ -44,7 +44,7 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
      * Name of the author
      */
     private String author;
-    private FeedImage image;
+    private String imageUrl;
     private List<FeedItem> items;
 
     /**
@@ -52,7 +52,6 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
      */
     private String lastUpdate;
 
-    private FlattrStatus flattrStatus;
     private String paymentLink;
     /**
      * Feed type, for example RSS 2 or Atom
@@ -93,12 +92,19 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
     private FeedItemFilter itemfilter;
 
     /**
+     * User-preferred sortOrder for display.
+     * Only those of scope {@link SortOrder.Scope#INTRA_FEED} is allowed.
+     */
+    @Nullable
+    private SortOrder sortOrder;
+
+    /**
      * This constructor is used for restoring a feed from the database.
      */
     public Feed(long id, String lastUpdate, String title, String customTitle, String link, String description, String paymentLink,
-                String author, String language, String type, String feedIdentifier, FeedImage image, String fileUrl,
-                String downloadUrl, boolean downloaded, FlattrStatus status, boolean paged, String nextPageLink,
-                String filter, boolean lastUpdateFailed) {
+                String author, String language, String type, String feedIdentifier, String imageUrl, String fileUrl,
+                String downloadUrl, boolean downloaded, boolean paged, String nextPageLink,
+                String filter, @Nullable SortOrder sortOrder, boolean lastUpdateFailed) {
         super(fileUrl, downloadUrl, downloaded);
         this.id = id;
         this.feedTitle = title;
@@ -111,8 +117,7 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
         this.language = language;
         this.type = type;
         this.feedIdentifier = feedIdentifier;
-        this.image = image;
-        this.flattrStatus = status;
+        this.imageUrl = imageUrl;
         this.paged = paged;
         this.nextPageLink = nextPageLink;
         this.items = new ArrayList<>();
@@ -121,17 +126,18 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
         } else {
             this.itemfilter = new FeedItemFilter(new String[0]);
         }
+        setSortOrder(sortOrder);
         this.lastUpdateFailed = lastUpdateFailed;
     }
 
     /**
-     * This constructor is used for test purposes and uses a default flattr status object.
+     * This constructor is used for test purposes
      */
     public Feed(long id, String lastUpdate, String title, String link, String description, String paymentLink,
-                String author, String language, String type, String feedIdentifier, FeedImage image, String fileUrl,
+                String author, String language, String type, String feedIdentifier, String imageUrl, String fileUrl,
                 String downloadUrl, boolean downloaded) {
-        this(id, lastUpdate, title, null, link, description, paymentLink, author, language, type, feedIdentifier, image,
-                fileUrl, downloadUrl, downloaded, new FlattrStatus(), false, null, null, false);
+        this(id, lastUpdate, title, null, link, description, paymentLink, author, language, type, feedIdentifier, imageUrl,
+                fileUrl, downloadUrl, downloaded, false, null, null, null, false);
     }
 
     /**
@@ -139,7 +145,6 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
      */
     public Feed() {
         super();
-        this.flattrStatus = new FlattrStatus();
     }
 
     /**
@@ -149,7 +154,6 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
     public Feed(String url, String lastUpdate) {
         super(null, url, false);
         this.lastUpdate = lastUpdate;
-        this.flattrStatus = new FlattrStatus();
     }
 
     /**
@@ -159,7 +163,6 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
     public Feed(String url, String lastUpdate, String title) {
         this(url, lastUpdate);
         this.feedTitle = title;
-        this.flattrStatus = new FlattrStatus();
     }
 
     /**
@@ -168,7 +171,7 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
      */
     public Feed(String url, String lastUpdate, String title, String username, String password) {
         this(url, lastUpdate, title);
-        preferences = new FeedPreferences(0, true, FeedPreferences.AutoDeleteAction.GLOBAL, username, password);
+        preferences = new FeedPreferences(0, true, FeedPreferences.AutoDeleteAction.GLOBAL, VolumeAdaptionSetting.OFF, username, password);
     }
 
     public static Feed fromCursor(Cursor cursor) {
@@ -186,11 +189,12 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
         int indexFileUrl = cursor.getColumnIndex(PodDBAdapter.KEY_FILE_URL);
         int indexDownloadUrl = cursor.getColumnIndex(PodDBAdapter.KEY_DOWNLOAD_URL);
         int indexDownloaded = cursor.getColumnIndex(PodDBAdapter.KEY_DOWNLOADED);
-        int indexFlattrStatus = cursor.getColumnIndex(PodDBAdapter.KEY_FLATTR_STATUS);
         int indexIsPaged = cursor.getColumnIndex(PodDBAdapter.KEY_IS_PAGED);
         int indexNextPageLink = cursor.getColumnIndex(PodDBAdapter.KEY_NEXT_PAGE_LINK);
         int indexHide = cursor.getColumnIndex(PodDBAdapter.KEY_HIDE);
+        int indexSortOrder = cursor.getColumnIndex(PodDBAdapter.KEY_SORT_ORDER);
         int indexLastUpdateFailed = cursor.getColumnIndex(PodDBAdapter.KEY_LAST_UPDATE_FAILED);
+        int indexImageUrl = cursor.getColumnIndex(PodDBAdapter.KEY_IMAGE_URL);
 
         Feed feed = new Feed(
                 cursor.getLong(indexId),
@@ -204,14 +208,14 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
                 cursor.getString(indexLanguage),
                 cursor.getString(indexType),
                 cursor.getString(indexFeedIdentifier),
-                null,
+                cursor.getString(indexImageUrl),
                 cursor.getString(indexFileUrl),
                 cursor.getString(indexDownloadUrl),
                 cursor.getInt(indexDownloaded) > 0,
-                new FlattrStatus(cursor.getLong(indexFlattrStatus)),
                 cursor.getInt(indexIsPaged) > 0,
                 cursor.getString(indexNextPageLink),
                 cursor.getString(indexHide),
+                SortOrder.fromCodeString(cursor.getString(indexSortOrder)),
                 cursor.getInt(indexLastUpdateFailed) > 0
         );
 
@@ -256,7 +260,9 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
 
     @Override
     public String getHumanReadableIdentifier() {
-        if (feedTitle != null) {
+        if (!TextUtils.isEmpty(customTitle)) {
+            return customTitle;
+        } else if (!TextUtils.isEmpty(feedTitle)) {
             return feedTitle;
         } else {
             return download_url;
@@ -266,8 +272,8 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
     public void updateFromOther(Feed other) {
         // don't update feed's download_url, we do that manually if redirected
         // see AntennapodHttpClient
-        if (other.image != null) {
-            this.image = other.image;
+        if (other.imageUrl != null) {
+            this.imageUrl = other.imageUrl;
         }
         if (other.feedTitle != null) {
             feedTitle = other.feedTitle;
@@ -290,9 +296,6 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
         if (other.paymentLink != null) {
             paymentLink = other.paymentLink;
         }
-        if (other.flattrStatus != null) {
-            flattrStatus = other.flattrStatus;
-        }
         // this feed's nextPage might already point to a higher page, so we only update the nextPage value
         // if this feed is not paged and the other feed is.
         if (!this.paged && other.paged) {
@@ -305,8 +308,8 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
         if (super.compareWithOther(other)) {
             return true;
         }
-        if (other.image != null) {
-            if (image == null || !TextUtils.equals(image.download_url, other.image.download_url)) {
+        if (other.imageUrl != null) {
+            if (imageUrl == null || !TextUtils.equals(imageUrl, other.imageUrl)) {
                 return true;
             }
         }
@@ -411,12 +414,12 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
         this.description = description;
     }
 
-    public FeedImage getImage() {
-        return image;
+    public String getImageUrl() {
+        return imageUrl;
     }
 
-    public void setImage(FeedImage image) {
-        this.image = image;
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
     }
 
     public List<FeedItem> getItems() {
@@ -441,14 +444,6 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
 
     public void setFeedIdentifier(String feedIdentifier) {
         this.feedIdentifier = feedIdentifier;
-    }
-
-    public void setFlattrStatus(FlattrStatus status) {
-        this.flattrStatus = status;
-    }
-
-    public FlattrStatus getFlattrStatus() {
-        return flattrStatus;
     }
 
     public String getPaymentLink() {
@@ -505,11 +500,7 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
 
     @Override
     public String getImageLocation() {
-        if (image != null) {
-            return image.getImageLocation();
-        } else {
-            return null;
-        }
+        return imageUrl;
     }
 
     public int getPageNr() {
@@ -545,6 +536,19 @@ public class Feed extends FeedFile implements FlattrThing, ImageResource {
         if (properties != null) {
             this.itemfilter = new FeedItemFilter(properties);
         }
+    }
+
+    @Nullable
+    public SortOrder getSortOrder() {
+        return sortOrder;
+    }
+
+    public void setSortOrder(@Nullable SortOrder sortOrder) {
+        if (sortOrder != null && sortOrder.scope != SortOrder.Scope.INTRA_FEED) {
+            throw new IllegalArgumentException("The specified sortOrder " + sortOrder
+                    + " is invalid. Only those with INTRA_FEED scope are allowed.");
+        }
+        this.sortOrder = sortOrder;
     }
 
     public boolean hasLastUpdateFailed() {

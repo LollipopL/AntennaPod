@@ -9,6 +9,9 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 import de.danoeh.antennapod.core.preferences.UserPreferences;
 
@@ -32,13 +35,9 @@ public class CrashReportWriter implements Thread.UncaughtExceptionHandler {
         PrintWriter out = null;
         try {
             out = new PrintWriter(new FileWriter(path));
-            out.println("[ Environment ]");
-            out.println("Android version: " + Build.VERSION.RELEASE);
-            out.println("OS version: " + System.getProperty("os.version"));
+            out.println("[ Crash info ]");
+            out.println("Time: " + new SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.getDefault()).format(new Date()));
             out.println("AntennaPod version: " + BuildConfig.VERSION_NAME);
-            out.println("Model: " + Build.MODEL);
-            out.println("Device: " + Build.DEVICE);
-            out.println("Product: " + Build.PRODUCT);
             out.println();
             out.println("[ StackTrace ]");
             ex.printStackTrace(out);
@@ -48,5 +47,15 @@ public class CrashReportWriter implements Thread.UncaughtExceptionHandler {
             IOUtils.closeQuietly(out);
         }
         defaultHandler.uncaughtException(thread, ex);
+    }
+
+    public static String getSystemInfo() {
+        return "[ Environment ]" +
+                "\nAndroid version: " + Build.VERSION.RELEASE +
+                "\nOS version: " + System.getProperty("os.version") +
+                "\nAntennaPod version: " + BuildConfig.VERSION_NAME +
+                "\nModel: " + Build.MODEL +
+                "\nDevice: " + Build.DEVICE +
+                "\nProduct: " + Build.PRODUCT;
     }
 }

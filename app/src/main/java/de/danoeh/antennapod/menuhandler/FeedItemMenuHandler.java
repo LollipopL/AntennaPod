@@ -1,11 +1,13 @@
 package de.danoeh.antennapod.menuhandler;
 
 import android.content.Context;
-import android.content.Intent;
-import android.net.Uri;
-import android.support.annotation.Nullable;
+import android.os.Handler;
+import androidx.annotation.NonNull;
+import com.google.android.material.snackbar.Snackbar;
+import androidx.fragment.app.Fragment;
 import android.util.Log;
-import android.widget.Toast;
+import android.view.Menu;
+import android.view.MenuItem;
 
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.core.feed.FeedItem;
@@ -13,12 +15,12 @@ import de.danoeh.antennapod.core.feed.FeedMedia;
 import de.danoeh.antennapod.core.gpoddernet.model.GpodnetEpisodeAction;
 import de.danoeh.antennapod.core.gpoddernet.model.GpodnetEpisodeAction.Action;
 import de.danoeh.antennapod.core.preferences.GpodnetPreferences;
+import de.danoeh.antennapod.core.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.core.preferences.UserPreferences;
 import de.danoeh.antennapod.core.service.playback.PlaybackService;
-import de.danoeh.antennapod.core.storage.DBTasks;
 import de.danoeh.antennapod.core.storage.DBWriter;
+import de.danoeh.antennapod.core.util.FeedItemUtil;
 import de.danoeh.antennapod.core.util.IntentUtils;
-import de.danoeh.antennapod.core.util.LongList;
 import de.danoeh.antennapod.core.util.ShareUtils;
 
 /**
@@ -32,104 +34,115 @@ public class FeedItemMenuHandler {
     }
 
     /**
-     * Used by the MenuHandler to access different types of menus through one
-     * interface
-     */
-    public interface MenuInterface {
-        /**
-         * Implementations of this method should call findItem(id) on their
-         * menu-object and call setVisibility(visibility) on the returned
-         * MenuItem object.
-         */
-        void setItemVisibility(int id, boolean visible);
-    }
-
-    /**
      * This method should be called in the prepare-methods of menus. It changes
      * the visibility of the menu items depending on a FeedItem's attributes.
      *
-     * @param mi               An instance of MenuInterface that the method uses to change a
-     *                         MenuItem's visibility
+     * @param menu               An instance of Menu
      * @param selectedItem     The FeedItem for which the menu is supposed to be prepared
-     * @param showExtendedMenu True if MenuItems that let the user share information about
-     *                         the FeedItem and visit its website should be set visible. This
-     *                         parameter should be set to false if the menu space is limited.
-     * @param queueAccess      Used for testing if the queue contains the selected item; only used for
-     *                         move to top/bottom in the queue
      * @return Returns true if selectedItem is not null.
      */
-    public static boolean onPrepareMenu(MenuInterface mi,
-                                        FeedItem selectedItem,
-                                        boolean showExtendedMenu,
-                                        @Nullable LongList queueAccess) {
-        if (selectedItem == null) {
+    public static boolean onPrepareMenu(Menu menu,
+                                        FeedItem selectedItem) {
+        if (menu == null || selectedItem == null) {
             return false;
         }
         boolean hasMedia = selectedItem.getMedia() != null;
         boolean isPlaying = hasMedia && selectedItem.getState() == FeedItem.State.PLAYING;
 
         if (!isPlaying) {
-            mi.setItemVisibility(R.id.skip_episode_item, false);
+            setItemVisibility(menu, R.id.skip_episode_item, false);
         }
-
         boolean isInQueue = selectedItem.isTagged(FeedItem.TAG_QUEUE);
-        if(queueAccess == null || queueAccess.size() == 0 || queueAccess.get(0) == selectedItem.getId()) {
-            mi.setItemVisibility(R.id.move_to_top_item, false);
-        }
-        if(queueAccess == null || queueAccess.size() == 0 || queueAccess.get(queueAccess.size()-1) == selectedItem.getId()) {
-            mi.setItemVisibility(R.id.move_to_bottom_item, false);
-        }
         if (!isInQueue) {
-            mi.setItemVisibility(R.id.remove_from_queue_item, false);
+            setItemVisibility(menu, R.id.remove_from_queue_item, false);
         }
         if (!(!isInQueue && selectedItem.getMedia() != null)) {
-            mi.setItemVisibility(R.id.add_to_queue_item, false);
+            setItemVisibility(menu, R.id.add_to_queue_item, false);
         }
-
-        if (!showExtendedMenu || selectedItem.getLink() == null) {
-            mi.setItemVisibility(R.id.visit_website_item, false);
-            mi.setItemVisibility(R.id.share_link_item, false);
-            mi.setItemVisibility(R.id.share_link_with_position_item, false);
+        if (!ShareUtils.hasLinkToShare(selectedItem)) {
+            setItemVisibility(menu, R.id.visit_website_item, false);
+            setItemVisibility(menu, R.id.share_link_item, false);
+            setItemVisibility(menu, R.id.share_link_with_position_item, false);
         }
-        if (!showExtendedMenu || !hasMedia || selectedItem.getMedia().getDownload_url() == null) {
-            mi.setItemVisibility(R.id.share_download_url_item, false);
-            mi.setItemVisibility(R.id.share_download_url_with_position_item, false);
+        if (!hasMedia || selectedItem.getMedia().getDownload_url() == null) {
+            setItemVisibility(menu, R.id.share_download_url_item, false);
+            setItemVisibility(menu, R.id.share_download_url_with_position_item, false);
         }
         if(!hasMedia || selectedItem.getMedia().getPosition() <= 0) {
-            mi.setItemVisibility(R.id.share_link_with_position_item, false);
-            mi.setItemVisibility(R.id.share_download_url_with_position_item, false);
+            setItemVisibility(menu, R.id.share_download_url_with_position_item, false);
+            setItemVisibility(menu, R.id.share_link_with_position_item, false);
         }
 
-        mi.setItemVisibility(R.id.share_file, hasMedia && selectedItem.getMedia().fileExists());
+        boolean fileDownloaded = hasMedia && selectedItem.getMedia().fileExists();
+        setItemVisibility(menu, R.id.share_file, fileDownloaded);
 
+        setItemVisibility(menu, R.id.remove_new_flag_item, selectedItem.isNew());
         if (selectedItem.isPlayed()) {
-            mi.setItemVisibility(R.id.mark_read_item, false);
+            setItemVisibility(menu, R.id.mark_read_item, false);
         } else {
-            mi.setItemVisibility(R.id.mark_unread_item, false);
+            setItemVisibility(menu, R.id.mark_unread_item, false);
         }
 
-        if(selectedItem.getMedia() == null || selectedItem.getMedia().getPosition() == 0) {
-            mi.setItemVisibility(R.id.reset_position, false);
+        if (selectedItem.getMedia() == null || selectedItem.getMedia().getPosition() == 0) {
+            setItemVisibility(menu, R.id.reset_position, false);
         }
 
-        if(!UserPreferences.isEnableAutodownload()) {
-            mi.setItemVisibility(R.id.activate_auto_download, false);
-            mi.setItemVisibility(R.id.deactivate_auto_download, false);
-        } else if(selectedItem.getAutoDownload()) {
-            mi.setItemVisibility(R.id.activate_auto_download, false);
+        if(!UserPreferences.isEnableAutodownload() || fileDownloaded) {
+            setItemVisibility(menu, R.id.activate_auto_download, false);
+            setItemVisibility(menu, R.id.deactivate_auto_download, false);
+        } else if (selectedItem.getAutoDownload()) {
+            setItemVisibility(menu, R.id.activate_auto_download, false);
         } else {
-            mi.setItemVisibility(R.id.deactivate_auto_download, false);
+            setItemVisibility(menu, R.id.deactivate_auto_download, false);
         }
 
-        if (selectedItem.getPaymentLink() == null || !selectedItem.getFlattrStatus().flattrable()) {
-            mi.setItemVisibility(R.id.support_item, false);
+        // Display proper strings when item has no media
+        if (!hasMedia && !selectedItem.isPlayed()) {
+            setItemTitle(menu, R.id.mark_read_item, R.string.mark_read_no_media_label);
+        }
+
+        if (!hasMedia && selectedItem.isPlayed()) {
+            setItemTitle(menu, R.id.mark_unread_item, R.string.mark_unread_label_no_media);
         }
 
         boolean isFavorite = selectedItem.isTagged(FeedItem.TAG_FAVORITE);
-        mi.setItemVisibility(R.id.add_to_favorites_item, !isFavorite);
-        mi.setItemVisibility(R.id.remove_from_favorites_item, isFavorite);
+        setItemVisibility(menu, R.id.add_to_favorites_item, !isFavorite);
+        setItemVisibility(menu, R.id.remove_from_favorites_item, isFavorite);
+
+        setItemVisibility(menu, R.id.remove_item, fileDownloaded);
 
         return true;
+    }
+
+    /**
+     * Used to set the viability of a menu item.
+     * This method also does some null-checking so that neither menu nor the menu item are null
+     * in order to prevent nullpointer exceptions.
+     * @param menu The menu that should be used
+     * @param menuId The id of the menu item that will be used
+     * @param visibility The new visibility status of given menu item
+     * */
+    private static void setItemVisibility(Menu menu, int menuId, boolean visibility) {
+        if (menu == null) {
+            return;
+        }
+        MenuItem item = menu.findItem(menuId);
+        if (item != null) {
+            item.setVisible(visibility);
+        }
+    }
+
+    /**
+     * This method allows to replace to String of a menu item with a different one.
+     * @param menu Menu item that should be used
+     * @param id The id of the string that is going to be replaced.
+     * @param noMedia The id of the new String that is going to be used.
+     * */
+    public static void setItemTitle(Menu menu, int id, int noMedia){
+        MenuItem item = menu.findItem(id);
+        if (item != null) {
+            item.setTitle(noMedia);
+        }
     }
 
     /**
@@ -139,33 +152,45 @@ public class FeedItemMenuHandler {
      * @param excludeIds Menu item that should be excluded
      * @return true if selectedItem is not null.
      */
-    public static boolean onPrepareMenu(MenuInterface mi,
+    public static boolean onPrepareMenu(Menu menu,
                                         FeedItem selectedItem,
-                                        boolean showExtendedMenu,
-                                        LongList queueAccess,
                                         int... excludeIds) {
-        boolean rc = onPrepareMenu(mi, selectedItem, showExtendedMenu, queueAccess);
+        if (menu == null || selectedItem == null ) {
+            return false;
+        }
+        boolean rc = onPrepareMenu(menu, selectedItem);
         if (rc && excludeIds != null) {
             for (int id : excludeIds) {
-                mi.setItemVisibility(id, false);
+                setItemVisibility(menu, id, false);
             }
         }
         return rc;
     }
 
-    public static boolean onMenuItemClicked(Context context, int menuItemId,
-                                            FeedItem selectedItem) {
+    /**
+     * Default menu handling for the given FeedItem.
+     *
+     * A Fragment instance, (rather than the more generic Context), is needed as a parameter
+     * to support some UI operations, e.g., creating a Snackbar.
+     */
+    public static boolean onMenuItemClicked(@NonNull Fragment fragment, int menuItemId,
+                                            @NonNull FeedItem selectedItem) {
+
+        @NonNull Context context = fragment.requireContext();
         switch (menuItemId) {
             case R.id.skip_episode_item:
-                context.sendBroadcast(new Intent(PlaybackService.ACTION_SKIP_CURRENT_EPISODE));
+                IntentUtils.sendLocalBroadcast(context, PlaybackService.ACTION_SKIP_CURRENT_EPISODE);
                 break;
             case R.id.remove_item:
                 DBWriter.deleteFeedMediaOfItem(context, selectedItem.getMedia().getId());
                 break;
+            case R.id.remove_new_flag_item:
+                removeNewFlagWithUndo(fragment, selectedItem);
+                break;
             case R.id.mark_read_item:
                 selectedItem.setPlayed(true);
-                DBWriter.markItemPlayed(selectedItem, FeedItem.PLAYED, false);
-                if(GpodnetPreferences.loggedIn()) {
+                DBWriter.markItemPlayed(selectedItem, FeedItem.PLAYED, true);
+                if (GpodnetPreferences.loggedIn()) {
                     FeedMedia media = selectedItem.getMedia();
                     // not all items have media, Gpodder only cares about those that do
                     if (media != null) {
@@ -183,7 +208,7 @@ public class FeedItemMenuHandler {
             case R.id.mark_unread_item:
                 selectedItem.setPlayed(false);
                 DBWriter.markItemPlayed(selectedItem, FeedItem.UNPLAYED, false);
-                if(GpodnetPreferences.loggedIn() && selectedItem.getMedia() != null) {
+                if (GpodnetPreferences.loggedIn() && selectedItem.getMedia() != null) {
                     GpodnetEpisodeAction actionNew = new GpodnetEpisodeAction.Builder(selectedItem, Action.NEW)
                             .currentDeviceId()
                             .currentTimestamp()
@@ -195,7 +220,7 @@ public class FeedItemMenuHandler {
                 DBWriter.addQueueItem(context, selectedItem);
                 break;
             case R.id.remove_from_queue_item:
-                DBWriter.removeQueueItem(context, selectedItem, true);
+                DBWriter.removeQueueItem(context, true, selectedItem);
                 break;
             case R.id.add_to_favorites_item:
                 DBWriter.addFavoriteItem(selectedItem);
@@ -205,6 +230,10 @@ public class FeedItemMenuHandler {
                 break;
             case R.id.reset_position:
                 selectedItem.getMedia().setPosition(0);
+                if (PlaybackPreferences.getCurrentlyPlayingFeedMediaId() == selectedItem.getMedia().getId()) {
+                    PlaybackPreferences.writeNoMediaPlaying();
+                    IntentUtils.sendLocalBroadcast(context, PlaybackService.ACTION_SHUTDOWN_PLAYBACK_SERVICE);
+                }
                 DBWriter.markItemPlayed(selectedItem, FeedItem.UNPLAYED, true);
                 break;
             case R.id.activate_auto_download:
@@ -216,17 +245,7 @@ public class FeedItemMenuHandler {
                 DBWriter.setFeedItemAutoDownload(selectedItem, false);
                 break;
             case R.id.visit_website_item:
-                Uri uri = Uri.parse(selectedItem.getLink());
-                Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-                if(IntentUtils.isCallable(context, intent)) {
-                    context.startActivity(intent);
-                } else {
-                    Toast.makeText(context, context.getString(R.string.download_error_malformed_url),
-                            Toast.LENGTH_SHORT).show();
-                }
-                break;
-            case R.id.support_item:
-                DBTasks.flattrItemIfLoggedIn(context, selectedItem);
+                IntentUtils.openInBrowser(context, FeedItemUtil.getLinkWithFallback(selectedItem));
                 break;
             case R.id.share_link_item:
                 ShareUtils.shareFeedItemLink(context, selectedItem);
@@ -250,6 +269,41 @@ public class FeedItemMenuHandler {
         // Refresh menu state
 
         return true;
+    }
+
+    /**
+     * Remove new flag with additional UI logic to allow undo with Snackbar.
+     *
+     * Undo is useful for Remove new flag, given there is no UI to undo it otherwise
+     * ,i.e., there is (context) menu item for add new flag
+     */
+    public static void removeNewFlagWithUndo(@NonNull Fragment fragment, FeedItem item) {
+        if (item == null) {
+            return;
+        }
+
+        Log.d(TAG, "removeNewFlagWithUndo(" + item.getId() + ")");
+        // we're marking it as unplayed since the user didn't actually play it
+        // but they don't want it considered 'NEW' anymore
+        DBWriter.markItemPlayed(FeedItem.UNPLAYED, item.getId());
+
+        final Handler h = new Handler(fragment.requireContext().getMainLooper());
+        final Runnable r = () -> {
+            FeedMedia media = item.getMedia();
+            if (media != null && media.hasAlmostEnded() && UserPreferences.isAutoDelete()) {
+                DBWriter.deleteFeedMediaOfItem(fragment.requireContext(), media.getId());
+            }
+        };
+
+        Snackbar snackbar = Snackbar.make(fragment.getView(), fragment.getString(R.string.removed_new_flag_label),
+                Snackbar.LENGTH_LONG);
+        snackbar.setAction(fragment.getString(R.string.undo), v -> {
+            DBWriter.markItemPlayed(FeedItem.NEW, item.getId());
+            // don't forget to cancel the thing that's going to remove the media
+            h.removeCallbacks(r);
+        });
+        snackbar.show();
+        h.postDelayed(r, (int) Math.ceil(snackbar.getDuration() * 1.05f));
     }
 
 }

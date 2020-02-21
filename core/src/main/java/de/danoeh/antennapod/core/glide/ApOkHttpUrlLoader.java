@@ -1,28 +1,33 @@
 package de.danoeh.antennapod.core.glide;
 
-import android.content.Context;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import android.text.TextUtils;
 import android.util.Log;
 
 import com.bumptech.glide.integration.okhttp3.OkHttpStreamFetcher;
-import com.bumptech.glide.load.data.DataFetcher;
-import com.bumptech.glide.load.model.GenericLoaderFactory;
+import com.bumptech.glide.load.Options;
 import com.bumptech.glide.load.model.GlideUrl;
 import com.bumptech.glide.load.model.ModelLoader;
 import com.bumptech.glide.load.model.ModelLoaderFactory;
 
+import de.danoeh.antennapod.core.service.BasicAuthorizationInterceptor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 
+import com.bumptech.glide.load.model.MultiModelLoaderFactory;
+import com.bumptech.glide.signature.ObjectKey;
 import de.danoeh.antennapod.core.service.download.AntennapodHttpClient;
 import de.danoeh.antennapod.core.service.download.HttpDownloader;
 import de.danoeh.antennapod.core.storage.DBReader;
 import de.danoeh.antennapod.core.util.NetworkUtils;
 import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
+import okhttp3.Protocol;
 import okhttp3.Request;
 import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 /**
  * @see com.bumptech.glide.integration.okhttp3.OkHttpUrlLoader
@@ -45,7 +50,6 @@ class ApOkHttpUrlLoader implements ModelLoader<String, InputStream> {
                     if (internalClient == null) {
                         OkHttpClient.Builder builder = AntennapodHttpClient.newBuilder();
                         builder.interceptors().add(new NetworkAllowanceInterceptor());
-                        builder.interceptors().add(new BasicAuthenticationInterceptor());
                         internalClient = builder.build();
                     }
                 }
@@ -56,19 +60,20 @@ class ApOkHttpUrlLoader implements ModelLoader<String, InputStream> {
         /**
          * Constructor for a new Factory that runs requests using a static singleton client.
          */
-        public Factory() {
+        Factory() {
             this(getInternalClient());
         }
 
         /**
          * Constructor for a new Factory that runs requests using given client.
          */
-        public Factory(OkHttpClient client) {
+        Factory(OkHttpClient client) {
             this.client = client;
         }
 
+        @NonNull
         @Override
-        public ModelLoader<String, InputStream> build(Context context, GenericLoaderFactory factories) {
+        public ModelLoader<String, InputStream> build(@NonNull MultiModelLoaderFactory multiFactory) {
             return new ApOkHttpUrlLoader(client);
         }
 
@@ -84,67 +89,39 @@ class ApOkHttpUrlLoader implements ModelLoader<String, InputStream> {
         this.client = client;
     }
 
+    @Nullable
     @Override
-    public DataFetcher<InputStream> getResourceFetcher(String model, int width, int height) {
-        Log.d(TAG, "getResourceFetcher() called with: " + "model = [" + model + "], width = ["
-                + width + "], height = [" + height + "]");
-        if(TextUtils.isEmpty(model)) {
+    public LoadData<InputStream> buildLoadData(@NonNull String model, int width, int height, @NonNull Options options) {
+        if (TextUtils.isEmpty(model)) {
             return null;
-        } else if(model.startsWith("/")) {
-            return new AudioCoverFetcher(model);
+        } else if (model.startsWith("/")) {
+            return new LoadData<>(new ObjectKey(model), new AudioCoverFetcher(model));
         } else {
             GlideUrl url = new GlideUrl(model);
-            return new OkHttpStreamFetcher(client, url);
+            return new LoadData<>(new ObjectKey(model), new OkHttpStreamFetcher(client, url));
         }
+    }
+
+    @Override
+    public boolean handles(@NonNull String s) {
+        return true;
     }
 
     private static class NetworkAllowanceInterceptor implements Interceptor {
 
         @Override
         public Response intercept(Chain chain) throws IOException {
-            if (NetworkUtils.isDownloadAllowed()) {
+            if (NetworkUtils.isImageAllowed()) {
                 return chain.proceed(chain.request());
             } else {
-                return null;
-            }
-        }
-
-    }
-
-    private static class BasicAuthenticationInterceptor implements Interceptor {
-
-        @Override
-        public Response intercept(Chain chain) throws IOException {
-            Request request = chain.request();
-            String url = request.url().toString();
-            String authentication = DBReader.getImageAuthentication(url);
-
-            if(TextUtils.isEmpty(authentication)) {
-                Log.d(TAG, "no credentials for '" + url + "'");
-                return chain.proceed(request);
-            }
-
-            // add authentication
-            String[] auth = authentication.split(":");
-            String credentials = HttpDownloader.encodeCredentials(auth[0], auth[1], "ISO-8859-1");
-            Request newRequest = request
-                    .newBuilder()
-                    .addHeader("Authorization", credentials)
-                    .build();
-            Log.d(TAG, "Basic authentication with ISO-8859-1 encoding");
-            Response response = chain.proceed(newRequest);
-            if (!response.isSuccessful() && response.code() == HttpURLConnection.HTTP_UNAUTHORIZED) {
-                credentials = HttpDownloader.encodeCredentials(auth[0], auth[1], "UTF-8");
-                newRequest = request
-                        .newBuilder()
-                        .addHeader("Authorization", credentials)
+                return new Response.Builder()
+                        .protocol(Protocol.HTTP_2)
+                        .code(420)
+                        .message("Policy Not Fulfilled")
+                        .body(ResponseBody.create(null, new byte[0]))
+                        .request(chain.request())
                         .build();
-                Log.d(TAG, "Basic authentication with UTF-8 encoding");
-                return chain.proceed(newRequest);
-            } else {
-                return response;
             }
         }
     }
-
 }

@@ -6,7 +6,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Build;
-import android.support.v4.content.FileProvider;
+import androidx.core.content.FileProvider;
 import android.util.Log;
 
 import java.io.File;
@@ -50,11 +50,15 @@ public class ShareUtils {
 		return item.getFeed().getTitle() + ": " + item.getTitle();
 	}
 
+    public static boolean hasLinkToShare(FeedItem item) {
+	    return FeedItemUtil.getLinkWithFallback(item) != null;
+    }
+
 	public static void shareFeedItemLink(Context context, FeedItem item, boolean withPosition) {
-		String text = getItemShareText(item) + " " + item.getLink();
+		String text = getItemShareText(item) + " " + FeedItemUtil.getLinkWithFallback(item);
 		if(withPosition) {
 			int pos = item.getMedia().getPosition();
-			text = item.getLink() + " [" + Converter.getDurationStringLong(pos) + "]";
+			text += " [" + Converter.getDurationStringLong(pos) + "]";
 		}
 		shareLink(context, text);
 	}

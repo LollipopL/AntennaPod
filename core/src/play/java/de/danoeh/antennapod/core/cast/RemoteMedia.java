@@ -5,7 +5,7 @@ import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 import android.text.TextUtils;
 
 import com.google.android.gms.cast.MediaInfo;
@@ -24,7 +24,6 @@ import de.danoeh.antennapod.core.feed.Feed;
 import de.danoeh.antennapod.core.feed.FeedItem;
 import de.danoeh.antennapod.core.feed.FeedMedia;
 import de.danoeh.antennapod.core.feed.MediaType;
-import de.danoeh.antennapod.core.storage.DBReader;
 import de.danoeh.antennapod.core.util.ChapterUtils;
 import de.danoeh.antennapod.core.util.playback.Playable;
 
@@ -129,14 +128,6 @@ public class RemoteMedia implements Playable {
 
     public String getFeedUrl() {
         return feedUrl;
-    }
-
-    public FeedMedia lookForFeedMedia() {
-        FeedItem feedItem = DBReader.getFeedItem(feedUrl, itemIdentifier);
-        if (feedItem == null) {
-            return null;
-        }
-        return feedItem.getMedia();
     }
 
     @Override

@@ -1,12 +1,16 @@
 package de.danoeh.antennapod.fragment;
 
 import android.os.Bundle;
-import android.support.v4.app.ListFragment;
+import androidx.fragment.app.ListFragment;
 import android.util.Log;
 import android.view.View;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+
+import java.util.ArrayList;
 import java.util.List;
 
 import de.danoeh.antennapod.R;
@@ -20,7 +24,8 @@ import de.danoeh.antennapod.core.service.download.Downloader;
 import de.danoeh.antennapod.core.storage.DBReader;
 import de.danoeh.antennapod.core.storage.DBWriter;
 import de.danoeh.antennapod.core.storage.DownloadRequester;
-import de.greenrobot.event.EventBus;
+import de.danoeh.antennapod.view.EmptyViewHandler;
+import org.greenrobot.eventbus.ThreadMode;
 
 /**
  * Displays all running downloads and provides actions to cancel them
@@ -30,7 +35,7 @@ public class RunningDownloadsFragment extends ListFragment {
     private static final String TAG = "RunningDownloadsFrag";
 
     private DownloadlistAdapter adapter;
-    private List<Downloader> downloaderList;
+    private List<Downloader> downloaderList = new ArrayList<>();
 
     @Override
     public void onViewCreated(View view, Bundle savedInstanceState) {
@@ -44,17 +49,24 @@ public class RunningDownloadsFragment extends ListFragment {
 
         adapter = new DownloadlistAdapter(getActivity(), itemAccess);
         setListAdapter(adapter);
+
+        EmptyViewHandler emptyView = new EmptyViewHandler(getActivity());
+        emptyView.setIcon(R.attr.av_download);
+        emptyView.setTitle(R.string.no_run_downloads_head_label);
+        emptyView.setMessage(R.string.no_run_downloads_label);
+        emptyView.attachToListView(getListView());
+
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
-        EventBus.getDefault().registerSticky(this);
+    public void onStart() {
+        super.onStart();
+        EventBus.getDefault().register(this);
     }
 
     @Override
-    public void onPause() {
-        super.onPause();
+    public void onStop() {
+        super.onStop();
         EventBus.getDefault().unregister(this);
     }
 
@@ -62,28 +74,25 @@ public class RunningDownloadsFragment extends ListFragment {
     public void onDestroy() {
         super.onDestroy();
         setListAdapter(null);
-        adapter = null;
     }
 
+    @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
     public void onEvent(DownloadEvent event) {
         Log.d(TAG, "onEvent() called with: " + "event = [" + event + "]");
         DownloaderUpdate update = event.update;
         downloaderList = update.downloaders;
-        if (adapter != null) {
-            adapter.notifyDataSetChanged();
-        }
+        adapter.notifyDataSetChanged();
     }
-
 
     private final DownloadlistAdapter.ItemAccess itemAccess = new DownloadlistAdapter.ItemAccess() {
         @Override
         public int getCount() {
-            return (downloaderList != null) ? downloaderList.size() : 0;
+            return downloaderList.size();
         }
 
         @Override
         public Downloader getItem(int position) {
-            if (downloaderList != null && 0 <= position && position < downloaderList.size()) {
+            if (0 <= position && position < downloaderList.size()) {
                 return downloaderList.get(position);
             } else {
                 return null;
@@ -95,11 +104,12 @@ public class RunningDownloadsFragment extends ListFragment {
             DownloadRequest downloadRequest = downloader.getDownloadRequest();
             DownloadRequester.getInstance().cancelDownload(getActivity(), downloadRequest.getSource());
 
-            if(downloadRequest.getFeedfileType() == FeedMedia.FEEDFILETYPE_FEEDMEDIA &&
-                    UserPreferences.isEnableAutodownload()) {
+            if (downloadRequest.getFeedfileType() == FeedMedia.FEEDFILETYPE_FEEDMEDIA
+                    && UserPreferences.isEnableAutodownload()) {
                 FeedMedia media = DBReader.getFeedMedia(downloadRequest.getFeedfileId());
                 DBWriter.setFeedItemAutoDownload(media.getItem(), false);
-                Toast.makeText(getActivity(), R.string.download_canceled_autodownload_enabled_msg, Toast.LENGTH_SHORT).show();
+                Toast.makeText(getActivity(), R.string.download_canceled_autodownload_enabled_msg,
+                        Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(getActivity(), R.string.download_canceled_msg, Toast.LENGTH_SHORT).show();
             }

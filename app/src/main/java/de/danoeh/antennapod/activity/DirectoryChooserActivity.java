@@ -5,9 +5,9 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.FileObserver;
-import android.support.v4.app.NavUtils;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
+import androidx.core.app.NavUtils;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -64,11 +64,11 @@ public class DirectoryChooserActivity extends AppCompatActivity {
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
         setContentView(R.layout.directory_chooser);
-        butConfirm = (Button) findViewById(R.id.butConfirm);
-        butCancel = (Button) findViewById(R.id.butCancel);
-        butNavUp = (ImageButton) findViewById(R.id.butNavUp);
-        txtvSelectedFolder = (TextView) findViewById(R.id.txtvSelectedFolder);
-        listDirectories = (ListView) findViewById(R.id.directory_list);
+        butConfirm = findViewById(R.id.butConfirm);
+        butCancel = findViewById(R.id.butCancel);
+        butNavUp = findViewById(R.id.butNavUp);
+        txtvSelectedFolder = findViewById(R.id.txtvSelectedFolder);
+        listDirectories = findViewById(R.id.directory_list);
 
         butConfirm.setOnClickListener(new OnClickListener() {
 

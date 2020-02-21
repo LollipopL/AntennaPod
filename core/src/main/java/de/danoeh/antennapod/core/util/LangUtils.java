@@ -1,10 +1,13 @@
 package de.danoeh.antennapod.core.util;
 
-import android.support.v4.util.ArrayMap;
+import androidx.collection.ArrayMap;
 
 import java.nio.charset.Charset;
 
 public class LangUtils {
+
+	private LangUtils(){}
+
 	public static final Charset UTF_8 = Charset.forName("UTF-8");
 
 	private static final ArrayMap<String, String> languages;

@@ -5,7 +5,6 @@ import android.util.Log;
 
 import org.xml.sax.Attributes;
 
-import de.danoeh.antennapod.core.feed.FeedImage;
 import de.danoeh.antennapod.core.feed.FeedItem;
 import de.danoeh.antennapod.core.feed.FeedMedia;
 import de.danoeh.antennapod.core.syndication.handler.HandlerState;
@@ -48,8 +47,6 @@ public class NSAtom extends Namespace {
     private static final String LINK_REL_ARCHIVES = "archives";
     private static final String LINK_REL_ENCLOSURE = "enclosure";
     private static final String LINK_REL_PAYMENT = "payment";
-    private static final String LINK_REL_RELATED = "related";
-    private static final String LINK_REL_SELF = "self";
     private static final String LINK_REL_NEXT = "next";
     // type-values
     private static final String LINK_TYPE_ATOM = "application/atom+xml";
@@ -100,11 +97,9 @@ public class NSAtom extends Namespace {
                         type = SyndTypeUtils.getMimeTypeFromUrl(href);
                     }
 
-                    if(SyndTypeUtils.enclosureTypeValid(type)) {
-                        FeedItem currItem = state.getCurrentItem();
-                        if(currItem != null && !currItem.hasMedia()) {
-                            currItem.setMedia(new FeedMedia(currItem, href, size, type));
-                        }
+                    FeedItem currItem = state.getCurrentItem();
+                    if (SyndTypeUtils.enclosureTypeValid(type) && currItem != null && !currItem.hasMedia()) {
+                        currItem.setMedia(new FeedMedia(currItem, href, size, type));
                     }
                 } else if (LINK_REL_PAYMENT.equals(rel)) {
                     state.getCurrentItem().setPaymentLink(href);
@@ -114,9 +109,9 @@ public class NSAtom extends Namespace {
                     String type = attributes.getValue(LINK_TYPE);
                     /*
                      * Use as link if a) no type-attribute is given and
-					 * feed-object has no link yet b) type of link is
-					 * LINK_TYPE_HTML or LINK_TYPE_XHTML
-					 */
+                     * feed-object has no link yet b) type of link is
+                     * LINK_TYPE_HTML or LINK_TYPE_XHTML
+                     */
                     if (state.getFeed() != null &&
                         ((type == null && state.getFeed().getLink() == null) ||
                             (LINK_TYPE_HTML.equals(type) || LINK_TYPE_XHTML.equals(type)))) {
@@ -210,10 +205,10 @@ public class NSAtom extends Namespace {
                 state.getCurrentItem().setPubDate(DateUtils.parse(content));
             } else if (PUBLISHED.equals(top) && ENTRY.equals(second) && state.getCurrentItem() != null) {
                 state.getCurrentItem().setPubDate(DateUtils.parse(content));
-            } else if (IMAGE_LOGO.equals(top) && state.getFeed() != null && state.getFeed().getImage() == null) {
-                state.getFeed().setImage(new FeedImage(state.getFeed(), content, null));
+            } else if (IMAGE_LOGO.equals(top) && state.getFeed() != null && state.getFeed().getImageUrl() == null) {
+                state.getFeed().setImageUrl(content);
             } else if (IMAGE_ICON.equals(top) && state.getFeed() != null) {
-                state.getFeed().setImage(new FeedImage(state.getFeed(), content, null));
+                state.getFeed().setImageUrl(content);
             } else if (AUTHOR_NAME.equals(top) && AUTHOR.equals(second) &&
                     state.getFeed() != null && state.getCurrentItem() == null) {
                 String currentName = state.getFeed().getAuthor();

@@ -33,7 +33,7 @@ public class SPAUtil {
      * sent before.
      */
     public static synchronized boolean sendSPAppsQueryFeedsIntent(Context context) {
-        if (context == null) throw new IllegalArgumentException("context = null");
+        assert context != null : "context = null";
         final Context appContext = context.getApplicationContext();
         if (appContext == null) {
             Log.wtf(TAG, "Unable to get application context");
@@ -46,7 +46,7 @@ public class SPAUtil {
 
             SharedPreferences.Editor editor = prefs.edit();
             editor.putBoolean(PREF_HAS_QUERIED_SP_APPS, true);
-            editor.commit();
+            editor.apply();
 
             return true;
         } else {
@@ -63,7 +63,7 @@ public class SPAUtil {
             SharedPreferences.Editor editor = PreferenceManager
                     .getDefaultSharedPreferences(c.getApplicationContext()).edit();
             editor.putBoolean(PREF_HAS_QUERIED_SP_APPS, false);
-            editor.commit();
+            editor.apply();
         }
     }
 }

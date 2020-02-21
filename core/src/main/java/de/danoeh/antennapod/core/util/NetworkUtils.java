@@ -5,7 +5,7 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
-import android.support.v4.net.ConnectivityManagerCompat;
+import androidx.core.net.ConnectivityManagerCompat;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -18,15 +18,16 @@ import de.danoeh.antennapod.core.feed.FeedMedia;
 import de.danoeh.antennapod.core.preferences.UserPreferences;
 import de.danoeh.antennapod.core.service.download.AntennapodHttpClient;
 import de.danoeh.antennapod.core.storage.DBWriter;
+import io.reactivex.Single;
+import io.reactivex.SingleOnSubscribe;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.schedulers.Schedulers;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import rx.Observable;
-import rx.Subscriber;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.schedulers.Schedulers;
 
 public class NetworkUtils {
+    private NetworkUtils(){}
 
 	private static final String TAG = NetworkUtils.class.getSimpleName();
 
@@ -67,8 +68,13 @@ public class NetworkUtils {
 						}
 					}
 				}
+			} else if (networkInfo.getType() == ConnectivityManager.TYPE_ETHERNET) {
+				Log.d(TAG, "Device is connected to Ethernet");
+				if (networkInfo.isConnected()) {
+					return true;
+				}
 			} else {
-				if (!UserPreferences.isEnableAutodownloadOnMobile()) {
+				if (!UserPreferences.isAllowMobileAutoDownload()) {
 					Log.d(TAG, "Auto Download not enabled on Mobile");
 					return false;
 				}
@@ -89,9 +95,27 @@ public class NetworkUtils {
         return info != null && info.isConnected();
     }
 
-	public static boolean isDownloadAllowed() {
-		return UserPreferences.isAllowMobileUpdate() || !NetworkUtils.isNetworkMetered();
-	}
+    public static boolean isEpisodeDownloadAllowed() {
+        return UserPreferences.isAllowMobileEpisodeDownload() || !NetworkUtils.isNetworkMetered();
+    }
+
+    public static boolean isEpisodeHeadDownloadAllowed() {
+        // It is not an image but it is a similarly tiny request
+        // that is probably not even considered a download by most users
+        return isImageAllowed();
+    }
+
+    public static boolean isImageAllowed() {
+        return UserPreferences.isAllowMobileImages() || !NetworkUtils.isNetworkMetered();
+    }
+
+    public static boolean isStreamingAllowed() {
+        return UserPreferences.isAllowMobileStreaming() || !NetworkUtils.isNetworkMetered();
+    }
+
+    public static boolean isFeedRefreshAllowed() {
+        return UserPreferences.isAllowMobileFeedRefresh() || !NetworkUtils.isNetworkMetered();
+    }
 
 	private static boolean isNetworkMetered() {
 		ConnectivityManager connManager = (ConnectivityManager) context
@@ -111,11 +135,10 @@ public class NetworkUtils {
         return null;
     }
 
-	public static Observable<Long> getFeedMediaSizeObservable(FeedMedia media) {
-        return Observable.create((Observable.OnSubscribe<Long>) subscriber -> {
-            if (!NetworkUtils.isDownloadAllowed()) {
-                subscriber.onNext(0L);
-                subscriber.onCompleted();
+	public static Single<Long> getFeedMediaSizeObservable(FeedMedia media) {
+        return Single.create((SingleOnSubscribe<Long>) emitter -> {
+            if (!NetworkUtils.isEpisodeHeadDownloadAllowed()) {
+                emitter.onSuccess(0L);
                 return;
             }
             long size = Integer.MIN_VALUE;
@@ -129,8 +152,7 @@ public class NetworkUtils {
 
                 String url = media.getDownload_url();
                 if(TextUtils.isEmpty(url)) {
-                    subscriber.onNext(0L);
-                    subscriber.onCompleted();
+                    emitter.onSuccess(0L);
                     return;
                 }
 
@@ -150,8 +172,7 @@ public class NetworkUtils {
                         }
                     }
                 } catch (IOException e) {
-                    subscriber.onNext(0L);
-                    subscriber.onCompleted();
+                    emitter.onSuccess(0L);
                     Log.e(TAG, Log.getStackTraceString(e));
                     return; // better luck next time
                 }
@@ -163,11 +184,10 @@ public class NetworkUtils {
             } else {
                 media.setSize(size);
             }
-            subscriber.onNext(size);
-            subscriber.onCompleted();
+            emitter.onSuccess(size);
             DBWriter.setFeedMedia(media);
         })
-                .subscribeOn(Schedulers.newThread())
+                .subscribeOn(Schedulers.io())
 				.observeOn(AndroidSchedulers.mainThread());
     }
 

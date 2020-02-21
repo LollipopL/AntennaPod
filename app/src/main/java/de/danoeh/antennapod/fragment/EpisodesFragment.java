@@ -4,11 +4,11 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.os.Bundle;
-import android.support.design.widget.TabLayout;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.FragmentPagerAdapter;
-import android.support.v4.view.ViewPager;
+import com.google.android.material.tabs.TabLayout;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentPagerAdapter;
+import androidx.viewpager.widget.ViewPager;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -46,11 +46,11 @@ public class EpisodesFragment extends Fragment {
         ((MainActivity) getActivity()).getSupportActionBar().setTitle(R.string.episodes_label);
 
         View rootView = inflater.inflate(R.layout.pager_fragment, container, false);
-        viewPager = (ViewPager)rootView.findViewById(R.id.viewpager);
+        viewPager = rootView.findViewById(R.id.viewpager);
         viewPager.setAdapter(new EpisodesPagerAdapter(getChildFragmentManager(), getResources()));
 
         // Give the TabLayout the ViewPager
-        tabLayout = (TabLayout) rootView.findViewById(R.id.sliding_tabs);
+        tabLayout = rootView.findViewById(R.id.sliding_tabs);
         tabLayout.setupWithViewPager(viewPager);
 
         return rootView;
@@ -79,7 +79,7 @@ public class EpisodesFragment extends Fragment {
     public static class EpisodesPagerAdapter extends FragmentPagerAdapter {
 
         private final Resources resources;
-        private final AllEpisodesFragment[] fragments = {
+        private final EpisodesListFragment[] fragments = {
                 new NewEpisodesFragment(),
                 new AllEpisodesFragment(),
                 new FavoriteEpisodesFragment()
@@ -106,7 +106,7 @@ public class EpisodesFragment extends Fragment {
                 case POS_ALL_EPISODES:
                     return resources.getString(R.string.all_episodes_short_label);
                 case POS_NEW_EPISODES:
-                    return resources.getString(R.string.new_label);
+                    return resources.getString(R.string.new_episodes_label);
                 case POS_FAV_EPISODES:
                     return resources.getString(R.string.favorite_episodes_label);
                 default:

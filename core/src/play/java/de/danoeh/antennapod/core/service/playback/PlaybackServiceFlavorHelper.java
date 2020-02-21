@@ -7,11 +7,11 @@ import android.content.IntentFilter;
 import android.net.NetworkInfo;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.annotation.StringRes;
+import androidx.annotation.NonNull;
+import androidx.annotation.StringRes;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
-import android.support.v7.media.MediaRouter;
+import androidx.mediarouter.media.MediaRouter;
 import android.support.wearable.media.MediaControlConstants;
 import android.util.Log;
 import android.widget.Toast;
@@ -20,6 +20,8 @@ import com.google.android.gms.cast.ApplicationMetadata;
 import com.google.android.libraries.cast.companionlibrary.cast.BaseCastManager;
 
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import de.danoeh.antennapod.core.cast.CastConsumer;
 import de.danoeh.antennapod.core.cast.CastManager;
@@ -54,11 +56,18 @@ public class PlaybackServiceFlavorHelper {
 
     PlaybackServiceFlavorHelper(Context context, PlaybackService.FlavorHelperCallback callback) {
         this.callback = callback;
+        if (!CastManager.isInitialized()) {
+            return;
+        }
         mediaRouter = MediaRouter.getInstance(context.getApplicationContext());
         setCastConsumer(context);
     }
 
     void initializeMediaPlayer(Context context) {
+        if (!CastManager.isInitialized()) {
+            callback.setMediaPlayer(new LocalPSMP(context, callback.getMediaPlayerCallback()));
+            return;
+        }
         castManager = CastManager.getInstance();
         castManager.addCastConsumer(castConsumer);
         boolean isCasting = castManager.isConnected();
@@ -75,10 +84,16 @@ public class PlaybackServiceFlavorHelper {
     }
 
     void removeCastConsumer() {
+        if (!CastManager.isInitialized()) {
+            return;
+        }
         castManager.removeCastConsumer(castConsumer);
     }
 
     boolean castDisconnect(boolean castDisconnect) {
+        if (!CastManager.isInitialized()) {
+            return false;
+        }
         if (castDisconnect) {
             castManager.disconnect();
         }
@@ -86,6 +101,9 @@ public class PlaybackServiceFlavorHelper {
     }
 
     boolean onMediaPlayerInfo(Context context, int code, @StringRes int resourceId) {
+        if (!CastManager.isInitialized()) {
+            return false;
+        }
         switch (code) {
             case RemotePSMP.CAST_ERROR:
                 callback.sendNotificationBroadcast(PlaybackService.NOTIFICATION_TYPE_SHOW_TOAST, resourceId);
@@ -175,9 +193,9 @@ public class PlaybackServiceFlavorHelper {
         }
         callback.sendNotificationBroadcast(PlaybackService.NOTIFICATION_TYPE_RELOAD,
                 PlaybackService.EXTRA_CODE_CAST);
-        switchMediaPlayer(new RemotePSMP(context, callback.getMediaPlayerCallback()),
-                info,
-                wasLaunched);
+        RemotePSMP remotePSMP = new RemotePSMP(context, callback.getMediaPlayerCallback());
+        switchMediaPlayer(remotePSMP, info, wasLaunched);
+        remotePSMP.init();
         // hardware volume buttons control the remote device volume
         mediaRouter.setMediaSessionCompat(callback.getMediaSession());
         registerWifiBroadcastReceiver();
@@ -190,8 +208,8 @@ public class PlaybackServiceFlavorHelper {
         PlaybackServiceMediaPlayer mediaPlayer = callback.getMediaPlayer();
         if (mediaPlayer != null) {
             try {
-                mediaPlayer.stopPlayback(false).get();
-            } catch (InterruptedException | ExecutionException e) {
+                mediaPlayer.stopPlayback(false).get(2, TimeUnit.SECONDS);
+            } catch (InterruptedException | ExecutionException | TimeoutException e) {
                 Log.e(TAG, "There was a problem stopping playback while switching media players", e);
             }
             mediaPlayer.shutdownQuietly();
@@ -216,6 +234,9 @@ public class PlaybackServiceFlavorHelper {
     }
 
     void registerWifiBroadcastReceiver() {
+        if (!CastManager.isInitialized()) {
+            return;
+        }
         if (wifiBroadcastReceiver != null) {
             return;
         }
@@ -241,6 +262,9 @@ public class PlaybackServiceFlavorHelper {
     }
 
     void unregisterWifiBroadcastReceiver() {
+        if (!CastManager.isInitialized()) {
+            return;
+        }
         if (wifiBroadcastReceiver != null) {
             callback.unregisterReceiver(wifiBroadcastReceiver);
             wifiBroadcastReceiver = null;
@@ -248,6 +272,9 @@ public class PlaybackServiceFlavorHelper {
     }
 
     boolean onSharedPreference(String key) {
+        if (!CastManager.isInitialized()) {
+            return false;
+        }
         if (UserPreferences.PREF_CAST_ENABLED.equals(key)) {
             if (!UserPreferences.isCastEnabled()) {
                 if (castManager.isConnecting() || castManager.isConnected()) {
@@ -261,6 +288,9 @@ public class PlaybackServiceFlavorHelper {
     }
 
     void sessionStateAddActionForWear(PlaybackStateCompat.Builder sessionState, String actionName, CharSequence name, int icon) {
+        if (!CastManager.isInitialized()) {
+            return;
+        }
         PlaybackStateCompat.CustomAction.Builder actionBuilder =
             new PlaybackStateCompat.CustomAction.Builder(actionName, name, icon);
         Bundle actionExtras = new Bundle();
@@ -271,6 +301,9 @@ public class PlaybackServiceFlavorHelper {
     }
 
     void mediaSessionSetExtraForWear(MediaSessionCompat mediaSession) {
+        if (!CastManager.isInitialized()) {
+            return;
+        }
         Bundle sessionExtras = new Bundle();
         sessionExtras.putBoolean(MediaControlConstants.EXTRA_RESERVE_SLOT_SKIP_TO_PREVIOUS, true);
         sessionExtras.putBoolean(MediaControlConstants.EXTRA_RESERVE_SLOT_SKIP_TO_NEXT, true);

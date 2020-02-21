@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/black"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:id="@+id/videoframe">
 
     <de.danoeh.antennapod.view.AspectRatioVideoView
         android:id="@+id/videoview"
@@ -24,6 +26,9 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
+        android:layoutDirection="ltr"
+        android:background="@android:color/transparent"
+        android:padding="16dp"
         android:orientation="horizontal">
 
         <ImageButton
@@ -31,27 +36,27 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_margin="8dp"
-            android:background="@drawable/overlay_button_circle_background"
+            android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/rewind_label"
-            android:src="@drawable/ic_av_rewind_80dp" />
+            app:srcCompat="@drawable/ic_av_fast_rewind_white_80dp" />
 
         <ImageButton
             android:id="@+id/butPlay"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_margin="8dp"
-            android:background="@drawable/overlay_button_circle_background"
+            android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/pause_label"
-            android:src="@drawable/ic_av_pause_circle_outline_80dp" />
+            app:srcCompat="@drawable/ic_av_pause_white_80dp" />
 
         <ImageButton
             android:id="@+id/butFF"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_margin="8dp"
-            android:background="@drawable/overlay_button_circle_background"
+            android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/fast_forward_label"
-            android:src="@drawable/ic_av_fast_forward_80dp" />
+            app:srcCompat="@drawable/ic_av_fast_forward_white_80dp" />
 
     </LinearLayout>
 
@@ -67,6 +72,7 @@
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:background="#80000000"
+            android:layoutDirection="ltr"
             android:paddingTop="8dp">
 
             <TextView
@@ -74,10 +80,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_alignParentLeft="true"
+                android:layout_alignParentStart="true"
                 android:layout_alignParentTop="true"
                 android:layout_marginBottom="8dp"
                 android:layout_marginLeft="8dp"
+                android:layout_marginStart="8dp"
                 android:layout_marginRight="8dp"
+                android:layout_marginEnd="8dp"
                 android:layout_marginTop="4dp"
                 android:text="@string/position_default_label"
                 android:textColor="@color/white"
@@ -88,10 +97,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_alignParentRight="true"
+                android:layout_alignParentEnd="true"
                 android:layout_alignParentTop="true"
                 android:layout_marginBottom="8dp"
                 android:layout_marginLeft="8dp"
+                android:layout_marginStart="8dp"
                 android:layout_marginRight="8dp"
+                android:layout_marginEnd="8dp"
                 android:layout_marginTop="4dp"
                 android:text="@string/position_default_label"
                 android:textColor="@color/white"
@@ -102,7 +114,10 @@
                 android:layout_width="0px"
                 android:layout_height="wrap_content"
                 android:layout_toLeftOf="@+id/txtvLength"
+                android:layout_toStartOf="@+id/txtvLength"
                 android:layout_toRightOf="@+id/txtvPosition"
+                android:layout_toEndOf="@+id/txtvPosition"
+                android:layout_centerInParent="true"
                 android:max="500" />
 
         </RelativeLayout>

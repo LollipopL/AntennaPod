@@ -4,9 +4,9 @@ import android.app.Activity;
 import android.content.Context;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.support.v4.app.ListFragment;
-import android.support.v4.view.MenuItemCompat;
-import android.support.v7.widget.SearchView;
+import androidx.fragment.app.ListFragment;
+import androidx.core.view.MenuItemCompat;
+import androidx.appcompat.widget.SearchView;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -40,7 +40,6 @@ public class TagListFragment extends ListFragment {
         inflater.inflate(R.menu.gpodder_podcasts, menu);
         MenuItem searchItem = menu.findItem(R.id.action_search);
         final SearchView sv = (SearchView) MenuItemCompat.getActionView(searchItem);
-        MenuItemUtils.adjustTextColor(getActivity(), sv);
         sv.setQueryHint(getString(R.string.gpodnet_search_hint));
         sv.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override

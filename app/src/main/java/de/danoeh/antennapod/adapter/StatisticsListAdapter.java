@@ -1,100 +1,130 @@
 package de.danoeh.antennapod.adapter;
 
 import android.content.Context;
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.bumptech.glide.Glide;
-
-import java.util.ArrayList;
-import java.util.List;
+import com.bumptech.glide.request.RequestOptions;
 
 import de.danoeh.antennapod.R;
-import de.danoeh.antennapod.core.feed.Feed;
 import de.danoeh.antennapod.core.glide.ApGlideSettings;
-import de.danoeh.antennapod.core.storage.DBReader;
-import de.danoeh.antennapod.core.util.Converter;
+import de.danoeh.antennapod.core.storage.StatisticsItem;
+import de.danoeh.antennapod.view.PieChartView;
+
+import java.util.List;
 
 /**
- * Adapter for the statistics list
+ * Parent Adapter for the playback and download statistics list.
  */
-public class StatisticsListAdapter extends BaseAdapter {
-    private final Context context;
-    private List<DBReader.StatisticsItem> feedTime = new ArrayList<>();
-    private boolean countAll = true;
+public abstract class StatisticsListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+    private static final int TYPE_HEADER = 0;
+    private static final int TYPE_FEED = 1;
+    final Context context;
+    private List<StatisticsItem> statisticsData;
+    PieChartView.PieChartData pieChartData;
 
-    public StatisticsListAdapter(Context context) {
+    StatisticsListAdapter(Context context) {
         this.context = context;
     }
 
-    public void setCountAll(boolean countAll) {
-        this.countAll = countAll;
+    @Override
+    public int getItemCount() {
+        return statisticsData.size() + 1;
     }
 
-    @Override
-    public int getCount() {
-        return feedTime.size();
-    }
-
-    @Override
-    public DBReader.StatisticsItem getItem(int position) {
-        return feedTime.get(position);
-    }
-
-    @Override
-    public long getItemId(int position) {
-        return feedTime.get(position).feed.getId();
-    }
-
-    @Override
-    public View getView(int position, View convertView, ViewGroup parent) {
-        StatisticsHolder holder;
-        Feed feed = feedTime.get(position).feed;
-
-        if (convertView == null) {
-            holder = new StatisticsHolder();
-            LayoutInflater inflater = (LayoutInflater) context
-                    .getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-
-            convertView = inflater.inflate(R.layout.statistics_listitem, parent, false);
-
-            holder.image = (ImageView) convertView.findViewById(R.id.imgvCover);
-            holder.title = (TextView) convertView.findViewById(R.id.txtvTitle);
-            holder.time = (TextView) convertView.findViewById(R.id.txtvTime);
-            convertView.setTag(holder);
-        } else {
-            holder = (StatisticsHolder) convertView.getTag();
+    public StatisticsItem getItem(int position) {
+        if (position == 0) {
+            return null;
         }
-
-        Glide.with(context)
-                .load(feed.getImageLocation())
-                .placeholder(R.color.light_gray)
-                .error(R.color.light_gray)
-                .diskCacheStrategy(ApGlideSettings.AP_DISK_CACHE_STRATEGY)
-                .fitCenter()
-                .dontAnimate()
-                .into(holder.image);
-
-        holder.title.setText(feed.getTitle());
-        holder.time.setText(Converter.shortLocalizedDuration(context,
-                countAll ? feedTime.get(position).timePlayedCountAll
-                        : feedTime.get(position).timePlayed));
-        return convertView;
+        return statisticsData.get(position - 1);
     }
 
-    public void update(List<DBReader.StatisticsItem> feedTime) {
-        this.feedTime = feedTime;
+    @Override
+    public int getItemViewType(int position) {
+        return position == 0 ? TYPE_HEADER : TYPE_FEED;
+    }
+
+    @NonNull
+    @Override
+    public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        LayoutInflater inflater = LayoutInflater.from(context);
+        if (viewType == TYPE_HEADER) {
+            View view = inflater.inflate(R.layout.statistics_listitem_total, parent, false);
+            TextView totalText = view.findViewById(R.id.total_description);
+            totalText.setText(getHeaderCaptionResourceId());
+            return new HeaderHolder(view);
+        }
+        return new StatisticsHolder(inflater.inflate(R.layout.statistics_listitem, parent, false));
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull RecyclerView.ViewHolder h, int position) {
+        if (getItemViewType(position) == TYPE_HEADER) {
+            HeaderHolder holder = (HeaderHolder) h;
+            holder.pieChart.setData(pieChartData);
+            holder.totalTime.setText(getHeaderValue());
+        } else {
+            StatisticsHolder holder = (StatisticsHolder) h;
+            StatisticsItem statsItem = statisticsData.get(position - 1);
+            Glide.with(context)
+                    .load(statsItem.feed.getImageLocation())
+                    .apply(new RequestOptions()
+                            .placeholder(R.color.light_gray)
+                            .error(R.color.light_gray)
+                            .diskCacheStrategy(ApGlideSettings.AP_DISK_CACHE_STRATEGY)
+                            .fitCenter()
+                            .dontAnimate())
+                    .into(holder.image);
+
+            holder.title.setText(statsItem.feed.getTitle());
+            holder.chip.setTextColor(pieChartData.getColorOfItem(position - 1));
+            onBindFeedViewHolder(holder, statsItem);
+        }
+    }
+
+    public void update(List<StatisticsItem> statistics) {
+        statisticsData = statistics;
+        pieChartData = generateChartData(statistics);
         notifyDataSetChanged();
     }
 
-    static class StatisticsHolder {
-        ImageView image;
-        TextView title;
-        TextView time;
+    static class HeaderHolder extends RecyclerView.ViewHolder {
+        TextView totalTime;
+        PieChartView pieChart;
+
+        HeaderHolder(View itemView) {
+            super(itemView);
+            totalTime = itemView.findViewById(R.id.total_time);
+            pieChart = itemView.findViewById(R.id.pie_chart);
+        }
     }
 
+    static class StatisticsHolder extends RecyclerView.ViewHolder {
+        ImageView image;
+        TextView title;
+        TextView value;
+        TextView chip;
+
+        StatisticsHolder(View itemView) {
+            super(itemView);
+            image = itemView.findViewById(R.id.imgvCover);
+            title = itemView.findViewById(R.id.txtvTitle);
+            value = itemView.findViewById(R.id.txtvValue);
+            chip = itemView.findViewById(R.id.chip);
+        }
+    }
+
+    abstract int getHeaderCaptionResourceId();
+
+    abstract String getHeaderValue();
+
+    abstract PieChartView.PieChartData generateChartData(List<StatisticsItem> statisticsData);
+
+    abstract void onBindFeedViewHolder(StatisticsHolder holder, StatisticsItem item);
 }

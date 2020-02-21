@@ -1,8 +1,11 @@
 package de.test.antennapod.handler;
 
 import android.content.Context;
-import android.test.InstrumentationTestCase;
-
+import androidx.test.InstrumentationRegistry;
+import androidx.test.filters.SmallTest;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.xml.sax.SAXException;
 
 import java.io.File;
@@ -17,7 +20,6 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import de.danoeh.antennapod.core.feed.Chapter;
 import de.danoeh.antennapod.core.feed.Feed;
-import de.danoeh.antennapod.core.feed.FeedImage;
 import de.danoeh.antennapod.core.feed.FeedItem;
 import de.danoeh.antennapod.core.feed.FeedMedia;
 import de.danoeh.antennapod.core.syndication.handler.FeedHandler;
@@ -26,18 +28,24 @@ import de.test.antennapod.util.syndication.feedgenerator.AtomGenerator;
 import de.test.antennapod.util.syndication.feedgenerator.FeedGenerator;
 import de.test.antennapod.util.syndication.feedgenerator.RSS2Generator;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
 /**
  * Tests for FeedHandler
  */
-public class FeedHandlerTest extends InstrumentationTestCase {
+@SmallTest
+public class FeedHandlerTest {
     private static final String FEEDS_DIR = "testfeeds";
 
     private File file = null;
     private OutputStream outputStream = null;
 
-    protected void setUp() throws Exception {
-        super.setUp();
-        Context context = getInstrumentation().getContext();
+    @Before
+    public void setUp() throws Exception {
+        Context context = InstrumentationRegistry.getTargetContext();
         File destDir = context.getExternalFilesDir(FEEDS_DIR);
         assertNotNull(destDir);
 
@@ -51,9 +59,8 @@ public class FeedHandlerTest extends InstrumentationTestCase {
     }
 
 
-    @Override
-    protected void tearDown() throws Exception {
-        super.tearDown();
+    @After
+    public void tearDown() throws Exception {
         file.delete();
         file = null;
 
@@ -82,15 +89,7 @@ public class FeedHandlerTest extends InstrumentationTestCase {
         assertEquals(feed.getLink(), parsedFeed.getLink());
         assertEquals(feed.getDescription(), parsedFeed.getDescription());
         assertEquals(feed.getPaymentLink(), parsedFeed.getPaymentLink());
-
-        if (feed.getImage() != null) {
-            FeedImage image = feed.getImage();
-            FeedImage parsedImage = parsedFeed.getImage();
-            assertNotNull(parsedImage);
-
-            assertEquals(image.getTitle(), parsedImage.getTitle());
-            assertEquals(image.getDownload_url(), parsedImage.getDownload_url());
-        }
+        assertEquals(feed.getImageUrl(), parsedFeed.getImageUrl());
 
         if (feed.getItems() != null) {
             assertNotNull(parsedFeed.getItems());
@@ -119,14 +118,7 @@ public class FeedHandlerTest extends InstrumentationTestCase {
                     assertEquals(media.getMime_type(), parsedMedia.getMime_type());
                 }
 
-                if (item.hasItemImage()) {
-                    assertTrue(parsedItem.hasItemImage());
-                    FeedImage image = item.getImage();
-                    FeedImage parsedImage = parsedItem.getImage();
-
-                    assertEquals(image.getTitle(), parsedImage.getTitle());
-                    assertEquals(image.getDownload_url(), parsedImage.getDownload_url());
-                }
+                assertEquals(item.getImageUrl(), parsedFeed.getImageUrl());
 
                 if (item.getChapters() != null) {
                     assertNotNull(parsedItem.getChapters());
@@ -145,12 +137,14 @@ public class FeedHandlerTest extends InstrumentationTestCase {
         }
     }
 
+    @Test
     public void testRSS2Basic() throws IOException, UnsupportedFeedtypeException, SAXException, ParserConfigurationException {
         Feed f1 = createTestFeed(10, false, true, true);
         Feed f2 = runFeedTest(f1, new RSS2Generator(), "UTF-8", RSS2Generator.FEATURE_WRITE_GUID);
         feedValid(f1, f2, Feed.TYPE_RSS2);
     }
 
+    @Test
     public void testAtomBasic() throws IOException, UnsupportedFeedtypeException, SAXException, ParserConfigurationException {
         Feed f1 = createTestFeed(10, false, true, true);
         Feed f2 = runFeedTest(f1, new AtomGenerator(), "UTF-8", 0);
@@ -158,12 +152,8 @@ public class FeedHandlerTest extends InstrumentationTestCase {
     }
 
     private Feed createTestFeed(int numItems, boolean withImage, boolean withFeedMedia, boolean withChapters) {
-        FeedImage image = null;
-        if (withImage) {
-            image = new FeedImage(0, "image", null, "http://example.com/picture", false);
-        }
         Feed feed = new Feed(0, null, "title", "http://example.com", "This is the description",
-                "http://example.com/payment", "Daniel", "en", null, "http://example.com/feed", image, file.getAbsolutePath(),
+                "http://example.com/payment", "Daniel", "en", null, "http://example.com/feed", "http://example.com/picture", file.getAbsolutePath(),
                 "http://example.com/feed", true);
         feed.setItems(new ArrayList<>());
 

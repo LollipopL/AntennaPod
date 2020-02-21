@@ -2,7 +2,7 @@ package de.danoeh.antennapod.core.feed;
 
 import android.content.Context;
 import android.database.Cursor;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 import android.text.TextUtils;
 
 import de.danoeh.antennapod.core.preferences.UserPreferences;
@@ -13,6 +13,8 @@ import de.danoeh.antennapod.core.storage.PodDBAdapter;
  * Contains preferences for a single feed.
  */
 public class FeedPreferences {
+
+    public static final float SPEED_USE_GLOBAL = -1;
 
     @NonNull
     private FeedFilter filter;
@@ -26,21 +28,27 @@ public class FeedPreferences {
         NO
     }
     private AutoDeleteAction auto_delete_action;
+
+    private VolumeAdaptionSetting volumeAdaptionSetting;
+
     private String username;
     private String password;
+    private float feedPlaybackSpeed;
 
-    public FeedPreferences(long feedID, boolean autoDownload, AutoDeleteAction auto_delete_action, String username, String password) {
-        this(feedID, autoDownload, true, auto_delete_action, username, password, new FeedFilter());
+    public FeedPreferences(long feedID, boolean autoDownload, AutoDeleteAction auto_delete_action, VolumeAdaptionSetting volumeAdaptionSetting, String username, String password) {
+        this(feedID, autoDownload, true, auto_delete_action, volumeAdaptionSetting, username, password, new FeedFilter(), SPEED_USE_GLOBAL);
     }
 
-    private FeedPreferences(long feedID, boolean autoDownload, boolean keepUpdated, AutoDeleteAction auto_delete_action, String username, String password, @NonNull FeedFilter filter) {
+    private FeedPreferences(long feedID, boolean autoDownload, boolean keepUpdated, AutoDeleteAction auto_delete_action, VolumeAdaptionSetting volumeAdaptionSetting, String username, String password, @NonNull FeedFilter filter, float feedPlaybackSpeed) {
         this.feedID = feedID;
         this.autoDownload = autoDownload;
         this.keepUpdated = keepUpdated;
         this.auto_delete_action = auto_delete_action;
+        this.volumeAdaptionSetting = volumeAdaptionSetting;
         this.username = username;
         this.password = password;
         this.filter = filter;
+        this.feedPlaybackSpeed = feedPlaybackSpeed;
     }
 
     public static FeedPreferences fromCursor(Cursor cursor) {
@@ -48,21 +56,26 @@ public class FeedPreferences {
         int indexAutoDownload = cursor.getColumnIndex(PodDBAdapter.KEY_AUTO_DOWNLOAD);
         int indexAutoRefresh = cursor.getColumnIndex(PodDBAdapter.KEY_KEEP_UPDATED);
         int indexAutoDeleteAction = cursor.getColumnIndex(PodDBAdapter.KEY_AUTO_DELETE_ACTION);
+        int indexVolumeAdaption = cursor.getColumnIndex(PodDBAdapter.KEY_FEED_VOLUME_ADAPTION);
         int indexUsername = cursor.getColumnIndex(PodDBAdapter.KEY_USERNAME);
         int indexPassword = cursor.getColumnIndex(PodDBAdapter.KEY_PASSWORD);
         int indexIncludeFilter = cursor.getColumnIndex(PodDBAdapter.KEY_INCLUDE_FILTER);
         int indexExcludeFilter = cursor.getColumnIndex(PodDBAdapter.KEY_EXCLUDE_FILTER);
+        int indexFeedPlaybackSpeed = cursor.getColumnIndex(PodDBAdapter.KEY_FEED_PLAYBACK_SPEED);
 
         long feedId = cursor.getLong(indexId);
         boolean autoDownload = cursor.getInt(indexAutoDownload) > 0;
         boolean autoRefresh = cursor.getInt(indexAutoRefresh) > 0;
         int autoDeleteActionIndex = cursor.getInt(indexAutoDeleteAction);
         AutoDeleteAction autoDeleteAction = AutoDeleteAction.values()[autoDeleteActionIndex];
+        int volumeAdaptionValue = cursor.getInt(indexVolumeAdaption);
+        VolumeAdaptionSetting volumeAdaptionSetting = VolumeAdaptionSetting.fromInteger(volumeAdaptionValue);
         String username = cursor.getString(indexUsername);
         String password = cursor.getString(indexPassword);
         String includeFilter = cursor.getString(indexIncludeFilter);
         String excludeFilter = cursor.getString(indexExcludeFilter);
-        return new FeedPreferences(feedId, autoDownload, autoRefresh, autoDeleteAction, username, password, new FeedFilter(includeFilter, excludeFilter));
+        float feedPlaybackSpeed = cursor.getFloat(indexFeedPlaybackSpeed);
+        return new FeedPreferences(feedId, autoDownload, autoRefresh, autoDeleteAction, volumeAdaptionSetting, username, password, new FeedFilter(includeFilter, excludeFilter), feedPlaybackSpeed);
     }
 
     /**
@@ -138,8 +151,16 @@ public class FeedPreferences {
         return auto_delete_action;
     }
 
+    public VolumeAdaptionSetting getVolumeAdaptionSetting() {
+        return volumeAdaptionSetting;
+    }
+
     public void setAutoDeleteAction(AutoDeleteAction auto_delete_action) {
         this.auto_delete_action = auto_delete_action;
+    }
+
+    public void setVolumeAdaptionSetting(VolumeAdaptionSetting volumeAdaptionSetting) {
+        this.volumeAdaptionSetting = volumeAdaptionSetting;
     }
 
     public boolean getCurrentAutoDelete() {
@@ -174,5 +195,13 @@ public class FeedPreferences {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public float getFeedPlaybackSpeed() {
+        return feedPlaybackSpeed;
+    }
+
+    public void setFeedPlaybackSpeed(float playbackSpeed) {
+        feedPlaybackSpeed = playbackSpeed;
     }
 }

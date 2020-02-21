@@ -8,19 +8,19 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.RemoteException;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 import android.support.v4.media.MediaDescriptionCompat;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
-import android.support.v4.util.Pair;
-import android.support.v4.view.MarginLayoutParamsCompat;
-import android.support.v4.view.accessibility.AccessibilityEventCompat;
-import android.support.v7.app.MediaRouteControllerDialog;
-import android.support.v7.graphics.Palette;
-import android.support.v7.media.MediaRouter;
-import android.support.v7.widget.AppCompatImageView;
+import androidx.core.util.Pair;
+import androidx.core.view.MarginLayoutParamsCompat;
+import androidx.core.view.accessibility.AccessibilityEventCompat;
+import androidx.mediarouter.app.MediaRouteControllerDialog;
+import androidx.palette.graphics.Palette;
+import androidx.mediarouter.media.MediaRouter;
+import androidx.appcompat.widget.AppCompatImageView;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.TypedValue;
@@ -35,16 +35,17 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.RequestOptions;
 import com.bumptech.glide.request.target.Target;
 
 import java.util.concurrent.ExecutionException;
 
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.core.glide.ApGlideSettings;
-import rx.Observable;
-import rx.Subscription;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.schedulers.Schedulers;
+import io.reactivex.Observable;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.schedulers.Schedulers;
 
 public class CustomMRControllerDialog extends MediaRouteControllerDialog {
     public static final String TAG = "CustomMRContrDialog";
@@ -60,7 +61,7 @@ public class CustomMRControllerDialog extends MediaRouteControllerDialog {
 
     private boolean viewsCreated = false;
 
-    private Subscription fetchArtSubscription;
+    private Disposable fetchArtSubscription;
 
     private MediaControllerCompat mediaController;
     private MediaControllerCompat.Callback mediaControllerCallback;
@@ -310,9 +311,7 @@ public class CustomMRControllerDialog extends MediaRouteControllerDialog {
                             AccessibilityEventCompat.TYPE_ANNOUNCEMENT);
                     event.setPackageName(getContext().getPackageName());
                     event.setClassName(getClass().getName());
-                    int resId = isPlaying ?
-                            android.support.v7.mediarouter.R.string.mr_controller_pause :
-                            android.support.v7.mediarouter.R.string.mr_controller_play;
+                    int resId = isPlaying ? R.string.mr_controller_pause : R.string.mr_controller_play;
                     event.getText().add(getContext().getString(resId));
                     accessibilityManager.sendAccessibilityEvent(event);
                 }
@@ -327,7 +326,7 @@ public class CustomMRControllerDialog extends MediaRouteControllerDialog {
     @Override
     public void onDetachedFromWindow() {
         if (fetchArtSubscription != null) {
-            fetchArtSubscription.unsubscribe();
+            fetchArtSubscription.dispose();
             fetchArtSubscription = null;
         }
         super.onDetachedFromWindow();
@@ -358,17 +357,17 @@ public class CustomMRControllerDialog extends MediaRouteControllerDialog {
         if (route.getPresentationDisplay() != null &&
                 route.getPresentationDisplay().getDisplayId() != MediaRouter.RouteInfo.PRESENTATION_DISPLAY_ID_NONE) {
             // The user is currently casting screen.
-            titleView.setText(android.support.v7.mediarouter.R.string.mr_controller_casting_screen);
+            titleView.setText(R.string.mr_controller_casting_screen);
             showTitle = true;
         } else if (state == null || state.getState() == PlaybackStateCompat.STATE_NONE) {
             // Show "No media selected" as we don't yet know the playback state.
             // (Only exception is bluetooth where we don't show anything.)
             if (!route.isBluetooth()) {
-                titleView.setText(android.support.v7.mediarouter.R.string.mr_controller_no_media_selected);
+                titleView.setText(R.string.mr_controller_no_media_selected);
                 showTitle = true;
             }
         } else if (!hasTitle && !hasSubtitle) {
-            titleView.setText(android.support.v7.mediarouter.R.string.mr_controller_no_info_available);
+            titleView.setText(R.string.mr_controller_no_info_available);
             showTitle = true;
         } else {
             if (hasTitle) {
@@ -396,11 +395,11 @@ public class CustomMRControllerDialog extends MediaRouteControllerDialog {
         }
 
         if (fetchArtSubscription != null) {
-            fetchArtSubscription.unsubscribe();
+            fetchArtSubscription.dispose();
         }
 
         fetchArtSubscription = Observable.fromCallable(() -> fetchArt(description))
-                .subscribeOn(Schedulers.newThread())
+                .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(result -> {
                     fetchArtSubscription = null;
@@ -434,16 +433,12 @@ public class CustomMRControllerDialog extends MediaRouteControllerDialog {
                 | PlaybackStateCompat.ACTION_PLAY_PAUSE)) != 0;
         if (isPlaying && supportsPause) {
             playPauseButton.setVisibility(View.VISIBLE);
-            playPauseButton.setImageResource(getThemeResource(getContext(),
-                    android.support.v7.mediarouter.R.attr.mediaRoutePauseDrawable));
-            playPauseButton.setContentDescription(getContext().getResources()
-                    .getText(android.support.v7.mediarouter.R.string.mr_controller_pause));
+            playPauseButton.setImageResource(getThemeResource(getContext(), R.attr.mediaRoutePauseDrawable));
+            playPauseButton.setContentDescription(getContext().getResources().getText(R.string.mr_controller_pause));
         } else if (!isPlaying && supportsPlay) {
             playPauseButton.setVisibility(View.VISIBLE);
-            playPauseButton.setImageResource(getThemeResource(getContext(),
-                    android.support.v7.mediarouter.R.attr.mediaRoutePlayDrawable));
-            playPauseButton.setContentDescription(getContext().getResources()
-                    .getText(android.support.v7.mediarouter.R.string.mr_controller_play));
+            playPauseButton.setImageResource(getThemeResource(getContext(), R.attr.mediaRoutePlayDrawable));
+            playPauseButton.setContentDescription(getContext().getResources().getText(R.string.mr_controller_play));
         } else {
             playPauseButton.setVisibility(View.GONE);
         }
@@ -454,6 +449,7 @@ public class CustomMRControllerDialog extends MediaRouteControllerDialog {
         return context.getTheme().resolveAttribute(attr, value, true) ? value.resourceId : 0;
     }
 
+    @NonNull
     private Pair<Bitmap, Integer> fetchArt(@NonNull MediaDescriptionCompat description) {
         Bitmap iconBitmap = description.getIconBitmap();
         Uri iconUri = description.getIconUri();
@@ -463,10 +459,10 @@ public class CustomMRControllerDialog extends MediaRouteControllerDialog {
         } else if (iconUri != null) {
             try {
                 art = Glide.with(getContext().getApplicationContext())
-                        .load(iconUri.toString())
                         .asBitmap()
-                        .diskCacheStrategy(ApGlideSettings.AP_DISK_CACHE_STRATEGY)
-                        .into(Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL)
+                        .load(iconUri.toString())
+                        .apply(RequestOptions.diskCacheStrategyOf(ApGlideSettings.AP_DISK_CACHE_STRATEGY))
+                        .submit(Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL)
                         .get();
             } catch (InterruptedException | ExecutionException e) {
                 Log.e(TAG, "Image art load failed", e);

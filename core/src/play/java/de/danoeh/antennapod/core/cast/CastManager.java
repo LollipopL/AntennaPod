@@ -24,10 +24,10 @@ package de.danoeh.antennapod.core.cast;
 
 import android.content.Context;
 import android.os.Build;
-import android.support.annotation.NonNull;
-import android.support.v4.view.ActionProvider;
-import android.support.v4.view.MenuItemCompat;
-import android.support.v7.media.MediaRouter;
+import androidx.annotation.NonNull;
+import androidx.core.view.ActionProvider;
+import androidx.core.view.MenuItemCompat;
+import androidx.mediarouter.media.MediaRouter;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MenuItem;
@@ -161,6 +161,10 @@ public class CastManager extends BaseCastManager implements OnFailedListener {
             throw new IllegalStateException(msg);
         }
         return INSTANCE;
+    }
+
+    public static boolean isInitialized() {
+        return INSTANCE != null;
     }
 
     /**
@@ -1239,14 +1243,11 @@ public class CastManager extends BaseCastManager implements OnFailedListener {
             throw new NoConnectionException();
         }
         Log.d(TAG, "remoteMediaPlayer.seek() to position " + position);
-        remoteMediaPlayer.seek(mApiClient,
-                position,
-                RESUME_STATE_UNCHANGED).
-                setResultCallback(result -> {
-                    if (!result.getStatus().isSuccess()) {
-                        onFailed(R.string.cast_failed_seek, result.getStatus().getStatusCode());
-                    }
-                });
+        remoteMediaPlayer.seek(mApiClient, position, RESUME_STATE_UNCHANGED).setResultCallback(result -> {
+            if (!result.getStatus().isSuccess()) {
+                onFailed(R.string.cast_failed_seek, result.getStatus().getStatusCode());
+            }
+        });
     }
 
     /**
@@ -1438,12 +1439,6 @@ public class CastManager extends BaseCastManager implements OnFailedListener {
      */
     public int getIdleReason() {
         return idleReason;
-    }
-
-    private void onMessageSendFailed(int errorCode) {
-        for (CastConsumer consumer : castConsumers) {
-            consumer.onDataMessageSendFailed(errorCode);
-        }
     }
 
     /*
@@ -1737,7 +1732,7 @@ public class CastManager extends BaseCastManager implements OnFailedListener {
      * {@link SwitchableMediaRouteActionProvider} associated with the button if the caller needs
      * such reference. It is assumed that the enclosing
      * {@link android.app.Activity} inherits (directly or indirectly) from
-     * {@link android.support.v7.app.AppCompatActivity}.
+     * {@link androidx.appcompat.app.AppCompatActivity}.
      *
      * @param menuItem MenuItem of the Media Router cast button.
      */

@@ -4,11 +4,11 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.os.Bundle;
-import android.support.design.widget.TabLayout;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.FragmentPagerAdapter;
-import android.support.v4.view.ViewPager;
+import com.google.android.material.tabs.TabLayout;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentPagerAdapter;
+import androidx.viewpager.widget.ViewPager;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -31,12 +31,12 @@ public class GpodnetMainFragment extends Fragment {
         super.onCreateView(inflater, container, savedInstanceState);
         View root = inflater.inflate(R.layout.pager_fragment, container, false);
 
-        viewPager = (ViewPager)root.findViewById(R.id.viewpager);
+        viewPager = root.findViewById(R.id.viewpager);
         GpodnetPagerAdapter pagerAdapter = new GpodnetPagerAdapter(getChildFragmentManager(), getResources());
         viewPager.setAdapter(pagerAdapter);
 
         // Give the TabLayout the ViewPager
-        tabLayout = (TabLayout) root.findViewById(R.id.sliding_tabs);
+        tabLayout = root.findViewById(R.id.sliding_tabs);
         tabLayout.setupWithViewPager(viewPager);
 
         return root;

@@ -1,6 +1,6 @@
 package de.danoeh.antennapod.core.service.download;
 
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 
 import java.net.Proxy;
 
@@ -20,6 +20,10 @@ public class ProxyConfig {
 
     public static ProxyConfig http(String host, int port, String username, String password) {
         return new ProxyConfig(Proxy.Type.HTTP, host, port, username, password);
+    }
+
+    public static ProxyConfig socks(String host, int port, String username, String password) {
+        return new ProxyConfig(Proxy.Type.SOCKS, host, port, username, password);
     }
 
     public ProxyConfig(Proxy.Type type, String host, int port, String username, String password) {

@@ -7,6 +7,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.text.ParsePosition;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.Locale;
@@ -17,7 +18,9 @@ import java.util.TimeZone;
  */
 public class DateUtils {
 
-    private static final String TAG = "DateUtils";
+    private DateUtils(){}
+
+	private static final String TAG = "DateUtils";
 
     private static final TimeZone defaultTimezone = TimeZone.getTimeZone("GMT");
 
@@ -85,7 +88,8 @@ public class DateUtils {
                 "yyyy-MM-dd'T'HH:mm:ss'Z'",
                 "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
                 "yyyy-MM-ddZ",
-                "yyyy-MM-dd"
+                "yyyy-MM-dd",
+                "EEE d MMM yyyy HH:mm:ss 'GMT'Z (z)"
         };
 
         SimpleDateFormat parser = new SimpleDateFormat("", Locale.US);
@@ -134,7 +138,7 @@ public class DateUtils {
         if (parts.length >= 2) {
             result += Integer.parseInt(parts[idx]) * 60000L;
             idx++;
-            result += (Float.parseFloat(parts[idx])) * 1000L;
+            result += (long) (Float.parseFloat(parts[idx]) * 1000L);
         }
         return result;
     }
@@ -159,11 +163,10 @@ public class DateUtils {
         if (date == null) {
             return "";
         }
+        GregorianCalendar now = new GregorianCalendar();
         GregorianCalendar cal = new GregorianCalendar();
-        cal.add(GregorianCalendar.YEAR, -1);
-        // some padding, because no one really remembers what day of the month it is
-        cal.add(GregorianCalendar.DAY_OF_MONTH, 10);
-        boolean withinLastYear = date.after(cal.getTime());
+        cal.setTime(date);
+        boolean withinLastYear = now.get(Calendar.YEAR) == cal.get(Calendar.YEAR);
         int format = android.text.format.DateUtils.FORMAT_ABBREV_ALL;
         if (withinLastYear) {
             format |= android.text.format.DateUtils.FORMAT_NO_YEAR;

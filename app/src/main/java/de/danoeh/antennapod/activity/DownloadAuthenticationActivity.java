@@ -3,8 +3,8 @@ package de.danoeh.antennapod.activity;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.v7.app.ActionBar;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AppCompatActivity;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -49,11 +49,11 @@ public class DownloadAuthenticationActivity extends AppCompatActivity {
         }
 
         setContentView(R.layout.download_authentication_activity);
-        TextView txtvDescription = (TextView) findViewById(R.id.txtvDescription);
-        etxtUsername = (EditText) findViewById(R.id.etxtUsername);
-        etxtPassword = (EditText) findViewById(R.id.etxtPassword);
-        Button butConfirm = (Button) findViewById(R.id.butConfirm);
-        Button butCancel = (Button) findViewById(R.id.butCancel);
+        TextView txtvDescription = findViewById(R.id.txtvDescription);
+        etxtUsername = findViewById(R.id.etxtUsername);
+        etxtPassword = findViewById(R.id.etxtPassword);
+        Button butConfirm = findViewById(R.id.butConfirm);
+        Button butCancel = findViewById(R.id.butCancel);
 
         Validate.isTrue(getIntent().hasExtra(ARG_DOWNLOAD_REQUEST), "Download request missing");
         DownloadRequest request = getIntent().getParcelableExtra(ARG_DOWNLOAD_REQUEST);

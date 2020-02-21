@@ -9,10 +9,15 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- ACCESS_FINE_LOCATION is needed only on Android 10+,
+        for Automatic Download Wifi filter's UI, which uses
+        WifiManager.WifiManager.getConfiguredNetworks()
+      -->
+    <uses-permission-sdk-23 android:name="android.permission.ACCESS_FINE_LOCATION" />
 
     <application
         android:allowBackup="true"
-        android:icon="@drawable/ic_launcher">
+        android:icon="@mipmap/ic_launcher">
 
         <service
             android:name=".service.download.DownloadService"
@@ -27,6 +32,7 @@
         </service>
         <service
             android:name=".service.GpodnetSyncService"
+            android:permission="android.permission.BIND_JOB_SERVICE"
             android:enabled="true" />
 
         <receiver
@@ -40,21 +46,10 @@
             </intent-filter>
         </receiver>
 
-        <receiver android:name=".receiver.AlarmUpdateReceiver">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.PACKAGE_REPLACED" />
-                <data
-                    android:path="de.danoeh.antennapod"
-                    android:scheme="package" />
-            </intent-filter>
+        <receiver android:name=".receiver.FeedUpdateReceiver"
+            android:label="@string/feed_update_receiver_name"
+            android:exported="true"> <!-- allow feeds update to be triggered by external apps -->
         </receiver>
-
-        <receiver android:name=".receiver.FeedUpdateReceiver">
-        </receiver>
-
     </application>
 
 </manifest>

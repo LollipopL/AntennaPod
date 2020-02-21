@@ -1,6 +1,7 @@
 package de.danoeh.antennapod.asynctask;
 
-import android.support.annotation.NonNull;
+import android.content.Context;
+import androidx.annotation.NonNull;
 import android.util.Log;
 
 import java.io.File;
@@ -12,7 +13,7 @@ import de.danoeh.antennapod.core.export.ExportWriter;
 import de.danoeh.antennapod.core.preferences.UserPreferences;
 import de.danoeh.antennapod.core.storage.DBReader;
 import de.danoeh.antennapod.core.util.LangUtils;
-import rx.Observable;
+import io.reactivex.Observable;
 
 /**
  * Writes an OPML file into the export directory in the background.
@@ -23,17 +24,19 @@ public class ExportWorker {
     private static final String TAG = "ExportWorker";
     private static final String DEFAULT_OUTPUT_NAME = "antennapod-feeds";
 
-    private final ExportWriter exportWriter;
-    private final File output;
+    private final @NonNull ExportWriter exportWriter;
+    private final @NonNull File output;
+    private final Context context;
 
-    public ExportWorker(ExportWriter exportWriter) {
+    public ExportWorker(@NonNull ExportWriter exportWriter, Context context) {
         this(exportWriter, new File(UserPreferences.getDataFolder(EXPORT_DIR),
-                DEFAULT_OUTPUT_NAME + "." + exportWriter.fileExtension()));
+                DEFAULT_OUTPUT_NAME + "." + exportWriter.fileExtension()), context);
     }
 
-    private ExportWorker(ExportWriter exportWriter, @NonNull File output) {
+    private ExportWorker(@NonNull ExportWriter exportWriter, @NonNull File output, Context context) {
         this.exportWriter = exportWriter;
         this.output = output;
+        this.context = context;
     }
 
     public Observable<File> exportObservable() {
@@ -45,7 +48,7 @@ public class ExportWorker {
             OutputStreamWriter writer = null;
             try {
                 writer = new OutputStreamWriter(new FileOutputStream(output), LangUtils.UTF_8);
-                exportWriter.writeDocument(DBReader.getFeedList(), writer);
+                exportWriter.writeDocument(DBReader.getFeedList(), writer, context);
                 subscriber.onNext(output);
             } catch (IOException e) {
                 subscriber.onError(e);
@@ -57,7 +60,7 @@ public class ExportWorker {
                         subscriber.onError(e);
                     }
                 }
-                subscriber.onCompleted();
+                subscriber.onComplete();
             }
         });
     }

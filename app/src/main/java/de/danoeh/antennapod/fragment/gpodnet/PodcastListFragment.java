@@ -4,9 +4,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.support.v4.app.Fragment;
-import android.support.v4.view.MenuItemCompat;
-import android.support.v7.widget.SearchView;
+import androidx.fragment.app.Fragment;
+import androidx.core.view.MenuItemCompat;
+import androidx.appcompat.widget.SearchView;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -54,9 +54,8 @@ public abstract class PodcastListFragment extends Fragment {
         inflater.inflate(R.menu.gpodder_podcasts, menu);
         MenuItem searchItem = menu.findItem(R.id.action_search);
         final SearchView sv = (SearchView) MenuItemCompat.getActionView(searchItem);
-        MenuItemUtils.adjustTextColor(getActivity(), sv);
         sv.setQueryHint(getString(R.string.gpodnet_search_hint));
-        sv.setOnQueryTextListener(new android.support.v7.widget.SearchView.OnQueryTextListener() {
+        sv.setOnQueryTextListener(new androidx.appcompat.widget.SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String s) {
                 sv.clearFocus();
@@ -78,10 +77,10 @@ public abstract class PodcastListFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View root = inflater.inflate(R.layout.gpodnet_podcast_list, container, false);
 
-        gridView = (GridView) root.findViewById(R.id.gridView);
-        progressBar = (ProgressBar) root.findViewById(R.id.progressBar);
-        txtvError = (TextView) root.findViewById(R.id.txtvError);
-        butRetry = (Button) root.findViewById(R.id.butRetry);
+        gridView = root.findViewById(R.id.gridView);
+        progressBar = root.findViewById(R.id.progressBar);
+        txtvError = root.findViewById(R.id.txtvError);
+        butRetry = root.findViewById(R.id.butRetry);
 
         gridView.setOnItemClickListener((parent, view, position, id) ->
                 onPodcastSelected((GpodnetPodcast) gridView.getAdapter().getItem(position)));

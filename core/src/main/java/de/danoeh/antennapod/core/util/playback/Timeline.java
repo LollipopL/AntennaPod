@@ -3,17 +3,21 @@ package de.danoeh.antennapod.core.util.playback;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Color;
-import android.support.annotation.ColorInt;
-import android.support.annotation.NonNull;
+import androidx.annotation.ColorInt;
+import androidx.annotation.NonNull;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.TypedValue;
 
+import de.danoeh.antennapod.core.feed.FeedItem;
+import org.apache.commons.io.IOUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -27,20 +31,20 @@ import de.danoeh.antennapod.core.util.ShownotesProvider;
  * shownotes to navigate to another position in the podcast or by highlighting certain parts of the shownotesProvider's
  * shownotes.
  * <p/>
- * A timeline object needs a shownotesProvider from which the chapter information is retrieved and shownotes are generated.
+ * A timeline object needs a shownotesProvider from which the chapter information
+ * is retrieved and shownotes are generated.
  */
 public class Timeline {
     private static final String TAG = "Timeline";
 
-    private static final String WEBVIEW_STYLE = "@font-face { font-family: 'Roboto-Light'; src: url('file:///android_asset/Roboto-Light.ttf'); } * { color: %s; font-family: roboto-Light; font-size: 13pt; } a { font-style: normal; text-decoration: none; font-weight: normal; color: #00A8DF; } a.timecode { color: #669900; } img { display: block; margin: 10 auto; max-width: %s; height: auto; } body { margin: %dpx %dpx %dpx %dpx; }";
+    private static final Pattern TIMECODE_LINK_REGEX = Pattern.compile("antennapod://timecode/((\\d+))");
+    private static final String TIMECODE_LINK = "<a class=\"timecode\" href=\"antennapod://timecode/%d\">%s</a>";
+    private static final Pattern TIMECODE_REGEX = Pattern.compile("\\b((\\d+):)?(\\d+):(\\d{2})\\b");
+    private static final Pattern LINE_BREAK_REGEX = Pattern.compile("<br */?>");
 
-
-    private ShownotesProvider shownotesProvider;
-
+    private final ShownotesProvider shownotesProvider;
     private final String noShownotesLabel;
-    private final String colorPrimaryString;
-    private final String colorSecondaryString;
-    private final int pageMargin;
+    private final String webviewStyle;
 
     public Timeline(Context context, ShownotesProvider shownotesProvider) {
         if (shownotesProvider == null) {
@@ -52,25 +56,20 @@ public class Timeline {
 
         TypedArray res = context.getTheme().obtainStyledAttributes(new int[]{android.R.attr.textColorPrimary});
         @ColorInt int col = res.getColor(0, 0);
-        colorPrimaryString = "rgba(" + Color.red(col) + "," + Color.green(col) + "," +
-                Color.blue(col) + "," + (Color.alpha(col) / 255.0) + ")";
+        final String colorPrimary = "rgba(" + Color.red(col) + "," + Color.green(col) + ","
+                + Color.blue(col) + "," + (Color.alpha(col) / 255.0) + ")";
         res.recycle();
-        res = context.getTheme().obtainStyledAttributes(new int[]{android.R.attr.textColorSecondary});
-        col = res.getColor(0, 0);
-        colorSecondaryString = "rgba(" + Color.red(col) + "," + Color.green(col) + "," +
-                Color.blue(col) + "," + (Color.alpha(col) / 255.0) + ")";
-        res.recycle();
-
-        pageMargin = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 8,
-                context.getResources().getDisplayMetrics()
-        );
+        final int margin = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 8,
+                context.getResources().getDisplayMetrics());
+        String styleString = "";
+        try {
+            InputStream templateStream = context.getAssets().open("shownotes-style.css");
+            styleString = IOUtils.toString(templateStream, "UTF-8");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        webviewStyle = String.format(Locale.getDefault(), styleString, colorPrimary, margin, margin, margin, margin);
     }
-
-    private static final Pattern TIMECODE_LINK_REGEX = Pattern.compile("antennapod://timecode/((\\d+))");
-    private static final String TIMECODE_LINK = "<a class=\"timecode\" href=\"antennapod://timecode/%d\">%s</a>";
-    private static final Pattern TIMECODE_REGEX = Pattern.compile("\\b(?:(?:(([0-9][0-9])):))?(([0-9][0-9])):(([0-9][0-9]))\\b");
-    private static final Pattern LINE_BREAK_REGEX = Pattern.compile("<br */?>");
-
 
     /**
      * Applies an app-specific CSS stylesheet and adds timecode links (optional).
@@ -78,39 +77,21 @@ public class Timeline {
      * This method does NOT change the original shownotes string of the shownotesProvider object and it should
      * also not be changed by the caller.
      *
-     * @param addTimecodes True if this method should add timecode links
      * @return The processed HTML string.
      */
-    public String processShownotes(final boolean addTimecodes) {
-        final Playable playable = (shownotesProvider instanceof Playable) ? (Playable) shownotesProvider : null;
-
-        // load shownotes
-
+    @NonNull
+    public String processShownotes() {
         String shownotes;
         try {
             shownotes = shownotesProvider.loadShownotes().call();
         } catch (Exception e) {
-            e.printStackTrace();
-            return null;
+            Log.e(TAG, "processShownotes() - encounters exceptions unexpectedly in load, treat as if no shownotes.", e);
+            shownotes = "";
         }
 
         if (TextUtils.isEmpty(shownotes)) {
             Log.d(TAG, "shownotesProvider contained no shownotes. Returning 'no shownotes' message");
-            shownotes = "<html>" +
-                    "<head>" +
-                    "<style type='text/css'>" +
-                    "html, body { margin: 0; padding: 0; width: 100%; height: 100%; } " +
-                    "html { display: table; }" +
-                    "body { display: table-cell; vertical-align: middle; text-align:center;" +
-                    "-webkit-text-size-adjust: none; font-size: 87%; color: " + colorSecondaryString + ";} " +
-                    "</style>" +
-                    "</head>" +
-                    "<body>" +
-                    "<p>" + noShownotesLabel + "</p>" +
-                    "</body>" +
-                    "</html>";
-            Log.d(TAG, "shownotes: " + shownotes);
-            return shownotes;
+            shownotes = "<html><head></head><body><p id='apNoShownotes'>" + noShownotesLabel + "</p></body></html>";
         }
 
         // replace ASCII line breaks with HTML ones if shownotes don't contain HTML line breaks already
@@ -119,42 +100,12 @@ public class Timeline {
         }
 
         Document document = Jsoup.parse(shownotes);
-
-        // apply style
-        String styleStr = String.format(Locale.getDefault(), WEBVIEW_STYLE, colorPrimaryString, "100%",
-                pageMargin, pageMargin, pageMargin, pageMargin);
-        document.head().appendElement("style").attr("type", "text/css").text(styleStr);
+        document.head().appendElement("style").attr("type", "text/css").text(webviewStyle);
 
         // apply timecode links
-        if (addTimecodes) {
-            Elements elementsWithTimeCodes = document.body().getElementsMatchingOwnText(TIMECODE_REGEX);
-            Log.d(TAG, "Recognized " + elementsWithTimeCodes.size() + " timecodes");
-            for (Element element : elementsWithTimeCodes) {
-                Matcher matcherLong = TIMECODE_REGEX.matcher(element.html());
-                StringBuffer buffer = new StringBuffer();
-                while (matcherLong.find()) {
-                    String h = matcherLong.group(1);
-                    String group = matcherLong.group(0);
-                    int time = (h != null) ? Converter.durationStringLongToMs(group) :
-                            Converter.durationStringShortToMs(group);
-
-                    String rep;
-                    if (playable == null || playable.getDuration() > time) {
-                        rep = String.format(Locale.getDefault(), TIMECODE_LINK, time, group);
-                    } else {
-                        rep = group;
-                    }
-                    matcherLong.appendReplacement(buffer, rep);
-                }
-                matcherLong.appendTail(buffer);
-
-                element.html(buffer.toString());
-            }
-        }
-
+        addTimecodes(document);
         return document.toString();
     }
-
 
     /**
      * Returns true if the given link is a timecode link.
@@ -182,8 +133,74 @@ public class Timeline {
         return -1;
     }
 
+    private void addTimecodes(Document document) {
+        Elements elementsWithTimeCodes = document.body().getElementsMatchingOwnText(TIMECODE_REGEX);
+        Log.d(TAG, "Recognized " + elementsWithTimeCodes.size() + " timecodes");
 
-    public void setShownotesProvider(@NonNull ShownotesProvider shownotesProvider) {
-        this.shownotesProvider = shownotesProvider;
+        if (elementsWithTimeCodes.size() == 0) {
+            // No elements with timecodes
+            return;
+        }
+
+        int playableDuration = Integer.MAX_VALUE;
+        if (shownotesProvider instanceof Playable) {
+            playableDuration = ((Playable) shownotesProvider).getDuration();
+        } else if (shownotesProvider instanceof FeedItem && ((FeedItem) shownotesProvider).getMedia() != null) {
+            playableDuration = ((FeedItem) shownotesProvider).getMedia().getDuration();
+        }
+
+        boolean useHourFormat = true;
+
+        if (playableDuration != Integer.MAX_VALUE) {
+
+            // We need to decide if we are going to treat short timecodes as HH:MM or MM:SS. To do
+            // so we will parse all the short timecodes and see if they fit in the duration. If one
+            // does not we will use MM:SS, otherwise all will be parsed as HH:MM.
+            for (Element element : elementsWithTimeCodes) {
+                Matcher matcherForElement = TIMECODE_REGEX.matcher(element.html());
+                while (matcherForElement.find()) {
+
+                    // We only want short timecodes right now.
+                    if (matcherForElement.group(1) == null) {
+                        int time = Converter.durationStringShortToMs(matcherForElement.group(0), true);
+
+                        // If the parsed timecode is greater then the duration then we know we need to
+                        // use the minute format so we are done.
+                        if (time > playableDuration) {
+                            useHourFormat = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (!useHourFormat) {
+                    break;
+                }
+            }
+        }
+
+        for (Element element : elementsWithTimeCodes) {
+
+            Matcher matcherForElement = TIMECODE_REGEX.matcher(element.html());
+            StringBuffer buffer = new StringBuffer();
+
+            while (matcherForElement.find()) {
+                String group = matcherForElement.group(0);
+
+                int time = matcherForElement.group(1) != null
+                                        ? Converter.durationStringLongToMs(group)
+                                        : Converter.durationStringShortToMs(group, useHourFormat);
+
+                String replacementText = group;
+                if (time < playableDuration) {
+                    replacementText = String.format(Locale.getDefault(), TIMECODE_LINK, time, group);
+                }
+
+                matcherForElement.appendReplacement(buffer, replacementText);
+            }
+
+            matcherForElement.appendTail(buffer);
+            element.html(buffer.toString());
+        }
     }
 }

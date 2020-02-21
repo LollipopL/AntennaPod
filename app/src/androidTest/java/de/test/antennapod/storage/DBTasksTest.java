@@ -1,8 +1,13 @@
 package de.test.antennapod.storage;
 
 import android.content.Context;
-import android.test.FlakyTest;
-import android.test.InstrumentationTestCase;
+
+import androidx.test.InstrumentationRegistry;
+import androidx.test.filters.SmallTest;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,29 +21,31 @@ import de.danoeh.antennapod.core.feed.FeedMedia;
 import de.danoeh.antennapod.core.preferences.UserPreferences;
 import de.danoeh.antennapod.core.storage.DBReader;
 import de.danoeh.antennapod.core.storage.DBTasks;
+import de.danoeh.antennapod.core.storage.DBWriter;
 import de.danoeh.antennapod.core.storage.PodDBAdapter;
 
+import static de.danoeh.antennapod.core.util.FeedItemUtil.getIdList;
 import static java.util.Collections.singletonList;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Test class for DBTasks
  */
-public class DBTasksTest extends InstrumentationTestCase {
-
-    private static final String TAG = "DBTasksTest";
-
+@SmallTest
+public class DBTasksTest {
     private Context context;
 
-    @Override
-    protected void tearDown() throws Exception {
-        super.tearDown();
+    @After
+    public void tearDown() throws Exception {
         assertTrue(PodDBAdapter.deleteDatabase());
     }
 
-    @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-        context = getInstrumentation().getTargetContext();
+    @Before
+    public void setUp() throws Exception {
+        context = InstrumentationRegistry.getTargetContext();
 
         // create new database
         PodDBAdapter.init(context);
@@ -50,7 +57,7 @@ public class DBTasksTest extends InstrumentationTestCase {
         UserPreferences.init(context);
     }
 
-    @FlakyTest(tolerance = 3)
+    @Test
     public void testUpdateFeedNewFeed() {
         final int NUM_ITEMS = 10;
 
@@ -70,6 +77,7 @@ public class DBTasksTest extends InstrumentationTestCase {
     }
 
     /** Two feeds with the same title, but different download URLs should be treated as different feeds. */
+    @Test
     public void testUpdateFeedSameTitle() {
 
         Feed feed1 = new Feed("url1", null, "title");
@@ -84,6 +92,7 @@ public class DBTasksTest extends InstrumentationTestCase {
         assertTrue(savedFeed1.getId() != savedFeed2.getId());
     }
 
+    @Test
     public void testUpdateFeedUpdatedFeed() {
         final int NUM_ITEMS_OLD = 10;
         final int NUM_ITEMS_NEW = 10;
@@ -124,6 +133,7 @@ public class DBTasksTest extends InstrumentationTestCase {
         updatedFeedTest(feedFromDB, feedID, itemIDs, NUM_ITEMS_OLD, NUM_ITEMS_NEW);
     }
 
+    @Test
     public void testUpdateFeedMediaUrlResetState() {
         final Feed feed = new Feed("url", null, "title");
         FeedItem item = new FeedItem(0, "item", "id", "link", new Date(), FeedItem.PLAYED, feed);
@@ -140,7 +150,9 @@ public class DBTasksTest extends InstrumentationTestCase {
 
         FeedMedia media = new FeedMedia(item, "url", 1024, "mime/type");
         item.setMedia(media);
-        feed.setItems(singletonList(item));
+        List<FeedItem> list = new ArrayList<>();
+        list.add(item);
+        feed.setItems(list);
 
         final Feed newFeed = DBTasks.updateFeed(context, feed)[0];
         assertTrue(feed != newFeed);
@@ -172,4 +184,82 @@ public class DBTasksTest extends InstrumentationTestCase {
             lastDate = item.getPubDate();
         }
     }
+
+    @Test
+    public void testAddQueueItemsInDownload_EnqueueEnabled() throws Exception {
+        // Setup test data / environment
+        UserPreferences.setEnqueueDownloadedEpisodes(true);
+        UserPreferences.setEnqueueLocation(UserPreferences.EnqueueLocation.BACK);
+
+        List<FeedItem> fis1 = createSavedFeed("Feed 1", 2).getItems();
+        List<FeedItem> fis2 = createSavedFeed("Feed 2", 3).getItems();
+
+        DBWriter.addQueueItem(context, fis1.get(0), fis2.get(0)).get();
+        // the first item fis1.get(0) is already in the queue
+        FeedItem[] itemsToDownload = new FeedItem[]{ fis1.get(0), fis1.get(1), fis2.get(2), fis2.get(1) };
+
+        // Expectations:
+        List<FeedItem> expectedEnqueued = Arrays.asList(fis1.get(1), fis2.get(2), fis2.get(1));
+        List<FeedItem> expectedQueue = new ArrayList<>();
+        expectedQueue.addAll(DBReader.getQueue());
+        expectedQueue.addAll(expectedEnqueued);
+
+        // Run actual test and assert results
+        List<? extends FeedItem> actualEnqueued =
+                DBTasks.enqueueFeedItemsToDownload(context, Arrays.asList(itemsToDownload));
+
+        assertEqualsByIds("Only items not in the queue are enqueued", expectedEnqueued, actualEnqueued);
+        assertEqualsByIds("Queue has new items appended", expectedQueue, DBReader.getQueue());
+    }
+
+    @Test
+    public void testAddQueueItemsInDownload_EnqueueDisabled() throws Exception {
+        // Setup test data / environment
+        UserPreferences.setEnqueueDownloadedEpisodes(false);
+
+        List<FeedItem> fis1 = createSavedFeed("Feed 1", 2).getItems();
+        List<FeedItem> fis2 = createSavedFeed("Feed 2", 3).getItems();
+
+        DBWriter.addQueueItem(context, fis1.get(0), fis2.get(0)).get();
+        FeedItem[] itemsToDownload = new FeedItem[]{ fis1.get(0), fis1.get(1), fis2.get(2), fis2.get(1) };
+
+        // Expectations:
+        List<FeedItem> expectedEnqueued = Collections.emptyList();
+        List<FeedItem> expectedQueue = DBReader.getQueue();
+
+        // Run actual test and assert results
+        List<? extends FeedItem> actualEnqueued =
+                DBTasks.enqueueFeedItemsToDownload(context, Arrays.asList(itemsToDownload));
+
+        assertEqualsByIds("No item is enqueued", expectedEnqueued, actualEnqueued);
+        assertEqualsByIds("Queue is unchanged", expectedQueue, DBReader.getQueue());
+    }
+
+    private void assertEqualsByIds(String msg, List<? extends FeedItem> expected, List<? extends FeedItem> actual) {
+        // assert only the IDs, so that any differences are easily to spot.
+        List<Long> expectedIds = getIdList(expected);
+        List<Long> actualIds = getIdList(actual);
+        assertEquals(msg, expectedIds, actualIds);
+    }
+
+    private Feed createSavedFeed(String title, int numFeedItems) {
+        final Feed feed = new Feed("url", null, title);
+
+        if (numFeedItems > 0) {
+            List<FeedItem> items = new ArrayList<>(numFeedItems);
+            for (int i = 1; i <= numFeedItems; i++) {
+                FeedItem item = new FeedItem(0, "item " + i + " of " + title, "id", "link",
+                        new Date(), FeedItem.UNPLAYED, feed);
+                items.add(item);
+            }
+            feed.setItems(items);
+        }
+
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        adapter.setCompleteFeed(feed);
+        adapter.close();
+        return feed;
+    }
+
 }

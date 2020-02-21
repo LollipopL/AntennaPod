@@ -1,50 +1,36 @@
 package de.danoeh.antennapod.activity;
 
-import android.app.Activity;
-import android.content.Intent;
 import android.os.Bundle;
-import android.preference.Preference;
-import android.preference.PreferenceFragment;
-import android.support.v7.app.ActionBar;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.PreferenceFragmentCompat;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
-import java.lang.ref.WeakReference;
+import com.bytehamster.lib.preferencesearch.SearchPreferenceResult;
+import com.bytehamster.lib.preferencesearch.SearchPreferenceResultListener;
 
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.core.preferences.UserPreferences;
-import de.danoeh.antennapod.preferences.PreferenceController;
+import de.danoeh.antennapod.fragment.preferences.AutoDownloadPreferencesFragment;
+import de.danoeh.antennapod.fragment.preferences.GpodderPreferencesFragment;
+import de.danoeh.antennapod.fragment.preferences.ImportExportPreferencesFragment;
+import de.danoeh.antennapod.fragment.preferences.IntegrationsPreferencesFragment;
+import de.danoeh.antennapod.fragment.preferences.MainPreferencesFragment;
+import de.danoeh.antennapod.fragment.preferences.NetworkPreferencesFragment;
+import de.danoeh.antennapod.fragment.preferences.PlaybackPreferencesFragment;
+import de.danoeh.antennapod.fragment.preferences.StoragePreferencesFragment;
+import de.danoeh.antennapod.fragment.preferences.UserInterfacePreferencesFragment;
 
 /**
  * PreferenceActivity for API 11+. In order to change the behavior of the preference UI, see
  * PreferenceController.
  */
-public class PreferenceActivity extends AppCompatActivity {
-
-    private static WeakReference<PreferenceActivity> instance;
-    private PreferenceController preferenceController;
-    private MainFragment prefFragment;
-    private final PreferenceController.PreferenceUI preferenceUI = new PreferenceController.PreferenceUI() {
-        @Override
-        public Preference findPreference(CharSequence key) {
-            return prefFragment.findPreference(key);
-        }
-
-        @Override
-        public Activity getActivity() {
-            return PreferenceActivity.this;
-        }
-    };
-
+public class PreferenceActivity extends AppCompatActivity implements SearchPreferenceResultListener {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // This must be the FIRST thing we do, otherwise other code may not have the
-        // reference it needs
-        instance = new WeakReference<>(this);
-
         setTheme(UserPreferences.getTheme());
         super.onCreate(savedInstanceState);
 
@@ -53,25 +39,67 @@ public class PreferenceActivity extends AppCompatActivity {
             ab.setDisplayHomeAsUpEnabled(true);
         }
 
-        // set up layout
         FrameLayout root = new FrameLayout(this);
         root.setId(R.id.content);
         root.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
 
-        // we need to create the PreferenceController before the MainFragment
-        // since the MainFragment depends on the preferenceController already being created
-        preferenceController = new PreferenceController(preferenceUI);
+        getSupportFragmentManager().beginTransaction().replace(R.id.content, new MainPreferencesFragment()).commit();
 
-        prefFragment = new MainFragment();
-        getFragmentManager().beginTransaction().replace(R.id.content, prefFragment).commit();
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        preferenceController.onActivityResult(requestCode, resultCode, data);
+    private PreferenceFragmentCompat getPreferenceScreen(int screen) {
+        PreferenceFragmentCompat prefFragment = null;
+
+        if (screen == R.xml.preferences_user_interface) {
+            prefFragment = new UserInterfacePreferencesFragment();
+        } else if (screen == R.xml.preferences_integrations) {
+            prefFragment = new IntegrationsPreferencesFragment();
+        } else if (screen == R.xml.preferences_network) {
+            prefFragment = new NetworkPreferencesFragment();
+        } else if (screen == R.xml.preferences_storage) {
+            prefFragment = new StoragePreferencesFragment();
+        } else if (screen == R.xml.preferences_import_export) {
+            prefFragment = new ImportExportPreferencesFragment();
+        } else if (screen == R.xml.preferences_autodownload) {
+            prefFragment = new AutoDownloadPreferencesFragment();
+        } else if (screen == R.xml.preferences_gpodder) {
+            prefFragment = new GpodderPreferencesFragment();
+        } else if (screen == R.xml.preferences_playback) {
+            prefFragment = new PlaybackPreferencesFragment();
+        }
+        return prefFragment;
+    }
+
+    public static int getTitleOfPage(int preferences) {
+        switch (preferences) {
+            case R.xml.preferences_network:
+                return R.string.network_pref;
+            case R.xml.preferences_autodownload:
+                return R.string.pref_automatic_download_title;
+            case R.xml.preferences_playback:
+                return R.string.playback_pref;
+            case R.xml.preferences_storage:
+                return R.string.storage_pref;
+            case R.xml.preferences_import_export:
+                return R.string.import_export_pref;
+            case R.xml.preferences_user_interface:
+                return R.string.user_interface_label;
+            case R.xml.preferences_integrations:
+                return R.string.integrations_label;
+            case R.xml.preferences_gpodder:
+                return R.string.gpodnet_main_label;
+            default:
+                return R.string.settings_label;
+        }
+    }
+
+    public PreferenceFragmentCompat openScreen(int screen) {
+        PreferenceFragmentCompat fragment = getPreferenceScreen(screen);
+        getSupportFragmentManager().beginTransaction().replace(R.id.content, fragment)
+                .addToBackStack(getString(getTitleOfPage(screen))).commit();
+        return fragment;
     }
 
     @Override
@@ -82,53 +110,20 @@ public class PreferenceActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case android.R.id.home:
+        if (item.getItemId() == android.R.id.home) {
+            if (getSupportFragmentManager().getBackStackEntryCount() == 0) {
                 finish();
-                return true;
-            default:
-                return false;
+            } else {
+                getSupportFragmentManager().popBackStack();
+            }
+            return true;
         }
+        return false;
     }
 
-    public static class MainFragment extends PreferenceFragment {
-
-        @Override
-        public void onCreate(Bundle savedInstanceState) {
-            super.onCreate(savedInstanceState);
-            setRetainInstance(true);
-            addPreferencesFromResource(R.xml.preferences);
-            PreferenceActivity activity = instance.get();
-            if(activity != null && activity.preferenceController != null) {
-                activity.preferenceController.onCreate();
-            }
-        }
-
-        @Override
-        public void onResume() {
-            super.onResume();
-            PreferenceActivity activity = instance.get();
-            if(activity != null && activity.preferenceController != null) {
-                activity.preferenceController.onResume();
-            }
-        }
-
-        @Override
-        public void onPause() {
-            PreferenceActivity activity = instance.get();
-            if(activity != null && activity.preferenceController != null) {
-                activity.preferenceController.onPause();
-            }
-            super.onPause();
-        }
-
-        @Override
-        public void onStop() {
-            PreferenceActivity activity = instance.get();
-            if(activity != null && activity.preferenceController != null) {
-                activity.preferenceController.onStop();
-            }
-            super.onStop();
-        }
+    @Override
+    public void onSearchResultClicked(SearchPreferenceResult result) {
+        PreferenceFragmentCompat fragment = openScreen(result.getResourceFile());
+        result.highlight(fragment);
     }
 }

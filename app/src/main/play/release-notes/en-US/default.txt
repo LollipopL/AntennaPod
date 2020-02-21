@@ -1,0 +1,3 @@
+- Enabled picture-in-picture for video podcasts by default (by @ByteHamster)
+- Fixed podcast discovery not showing local trends (by @tonytamsf)
+- Various bug fixes and improvements (by @ByteHamster)

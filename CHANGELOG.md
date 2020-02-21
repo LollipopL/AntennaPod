@@ -1,6 +1,53 @@
 Change Log
 ==========
 
+Version 1.8.0
+-------------
+* Added per-feed playback speed setting (by @spacecowboy)
+* Support sorting in Podcast screen (by @orionlee)
+* Option to show stream button rather than download in lists (by @dsmith47)
+* Option to replace Episode cover with Podcast cover (by @xgouchet)
+* Transparent widget (by @M-arcel)
+* User interface tweaks (by @ByteHamster)
+* Tons of bug fixes and improvements
+
+Version 1.7.3
+-------------
+* Display episode image on widget (by @brad)
+* Added checkbox to keep queue sorted (by @damoasda)
+* New UI for "Add podcast" screen (by @ByteHamster)
+* Added batch editing to the queue (by @ByteHamster)
+* Added option to adapt remaining time to playback speed (by @CedricCabessa)
+* Removed broken Flattr integration (by @ByteHamster)
+* Added filter to "All episodes" list (by @jhunnius)
+* Tons of bug fixes and performance improvements
+
+Version 1.7.2
+-------------
+* Added configurable behavior of the back button
+* Added delete option to episode's context menu
+* New UI for batch edit feature
+* Set number of columns in subscription list
+* Lots of bug fixes
+
+Version 1.7.1
+-------------
+
+* Fix for database corruption
+
+Version 1.7.0
+-------------
+
+* NEW ExoPlayer (experimental)
+* Fix for Bluetooth Forward (Oreo)
+* Preference redesign + search
+* Notification improvements
+* Different screens for feed info and settings
+* Sort Queue with Random or Smart Shuffle
+* True Black Theme for AMOLED
+* Improvements to feed parsing
+* Fix for app being killed by Android Oreo
+
 Version 1.6.5
 -------------
 

@@ -6,9 +6,7 @@ import android.content.Intent;
 import android.util.Log;
 
 import de.danoeh.antennapod.core.ClientConfig;
-import de.danoeh.antennapod.core.preferences.UserPreferences;
-import de.danoeh.antennapod.core.storage.DBTasks;
-import de.danoeh.antennapod.core.util.NetworkUtils;
+import de.danoeh.antennapod.core.util.download.AutoUpdateManager;
 
 /**
  * Refreshes all feeds when it receives an intent
@@ -21,12 +19,8 @@ public class FeedUpdateReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         Log.d(TAG, "Received intent");
         ClientConfig.initialize(context);
-        if (NetworkUtils.networkAvailable() && NetworkUtils.isDownloadAllowed()) {
-            DBTasks.refreshAllFeeds(context, null);
-        } else {
-            Log.d(TAG, "Blocking automatic update: no wifi available / no mobile updates allowed");
-        }
-        UserPreferences.restartUpdateAlarm(false);
+
+        AutoUpdateManager.runOnce();
     }
 
 }

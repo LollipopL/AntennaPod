@@ -2,7 +2,7 @@ package de.danoeh.antennapod.activity;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatActivity;
 import android.util.SparseBooleanArray;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -39,9 +39,9 @@ public class OpmlFeedChooserActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.opml_selection);
-        butConfirm = (Button) findViewById(R.id.butConfirm);
-        butCancel = (Button) findViewById(R.id.butCancel);
-        feedlist = (ListView) findViewById(R.id.feedlist);
+        butConfirm = findViewById(R.id.butConfirm);
+        butCancel = findViewById(R.id.butCancel);
+        feedlist = findViewById(R.id.feedlist);
 
         feedlist.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
         listAdapter = new ArrayAdapter<>(this,

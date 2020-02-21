@@ -2,11 +2,10 @@ package de.danoeh.antennapod.activity.gpoddernet;
 
 import android.content.Context;
 import android.content.Intent;
-import android.content.res.Configuration;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatActivity;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
@@ -25,6 +24,8 @@ import android.widget.ViewFlipper;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import de.danoeh.antennapod.BuildConfig;
 import de.danoeh.antennapod.R;
@@ -44,8 +45,6 @@ import de.danoeh.antennapod.core.service.GpodnetSyncService;
  */
 public class GpodnetAuthenticationActivity extends AppCompatActivity {
     private static final String TAG = "GpodnetAuthActivity";
-
-    private static final String CURRENT_STEP = "current_step";
 
     private ViewFlipper viewFlipper;
 
@@ -72,7 +71,7 @@ public class GpodnetAuthenticationActivity extends AppCompatActivity {
         setContentView(R.layout.gpodnetauth_activity);
         service = new GpodnetService();
 
-        viewFlipper = (ViewFlipper) findViewById(R.id.viewflipper);
+        viewFlipper = findViewById(R.id.viewflipper);
         LayoutInflater inflater = (LayoutInflater)
                 getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         views = new View[]{
@@ -104,16 +103,12 @@ public class GpodnetAuthenticationActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-    }
-
     private void setupLoginView(View view) {
-        final EditText username = (EditText) view.findViewById(R.id.etxtUsername);
-        final EditText password = (EditText) view.findViewById(R.id.etxtPassword);
-        final Button login = (Button) view.findViewById(R.id.butLogin);
-        final TextView txtvError = (TextView) view.findViewById(R.id.txtvError);
-        final ProgressBar progressBar = (ProgressBar) view.findViewById(R.id.progBarLogin);
+        final EditText username = view.findViewById(R.id.etxtUsername);
+        final EditText password = view.findViewById(R.id.etxtPassword);
+        final Button login = view.findViewById(R.id.butLogin);
+        final TextView txtvError = view.findViewById(R.id.txtvError);
+        final ProgressBar progressBar = view.findViewById(R.id.progBarLogin);
 
         password.setOnEditorActionListener((v, actionID, event) ->
             actionID == EditorInfo.IME_ACTION_GO && login.performClick());
@@ -125,6 +120,11 @@ public class GpodnetAuthenticationActivity extends AppCompatActivity {
                 final String usernameStr = username.getText().toString();
                 final String passwordStr = password.getText().toString();
 
+                if (usernameHasUnwantedChars(usernameStr)) {
+                    txtvError.setText(R.string.gpodnetsync_username_characters_error);
+                    txtvError.setVisibility(View.VISIBLE);
+                    return;
+                }
                 if (BuildConfig.DEBUG) Log.d(TAG, "Checking login credentials");
                 AsyncTask<GpodnetService, Void, Void> authTask = new AsyncTask<GpodnetService, Void, Void>() {
 
@@ -177,13 +177,13 @@ public class GpodnetAuthenticationActivity extends AppCompatActivity {
     }
 
     private void setupDeviceView(View view) {
-        final EditText deviceID = (EditText) view.findViewById(R.id.etxtDeviceID);
-        final EditText caption = (EditText) view.findViewById(R.id.etxtCaption);
-        final Button createNewDevice = (Button) view.findViewById(R.id.butCreateNewDevice);
-        final Button chooseDevice = (Button) view.findViewById(R.id.butChooseExistingDevice);
-        final TextView txtvError = (TextView) view.findViewById(R.id.txtvError);
-        final ProgressBar progBarCreateDevice = (ProgressBar) view.findViewById(R.id.progbarCreateDevice);
-        final Spinner spinnerDevices = (Spinner) view.findViewById(R.id.spinnerChooseDevice);
+        final EditText deviceID = view.findViewById(R.id.etxtDeviceID);
+        final EditText caption = view.findViewById(R.id.etxtCaption);
+        final Button createNewDevice = view.findViewById(R.id.butCreateNewDevice);
+        final Button chooseDevice = view.findViewById(R.id.butChooseExistingDevice);
+        final TextView txtvError = view.findViewById(R.id.txtvError);
+        final ProgressBar progBarCreateDevice = view.findViewById(R.id.progbarCreateDevice);
+        final Spinner spinnerDevices = view.findViewById(R.id.spinnerChooseDevice);
 
 
         // load device list
@@ -348,8 +348,8 @@ public class GpodnetAuthenticationActivity extends AppCompatActivity {
     }
 
     private void setupFinishView(View view) {
-        final Button sync = (Button) view.findViewById(R.id.butSyncNow);
-        final Button back = (Button) view.findViewById(R.id.butGoMainscreen);
+        final Button sync = view.findViewById(R.id.butSyncNow);
+        final Button back = view.findViewById(R.id.butGoMainscreen);
 
         sync.setOnClickListener(v -> {
             GpodnetSyncService.sendSyncIntent(GpodnetAuthenticationActivity.this);
@@ -396,5 +396,11 @@ public class GpodnetAuthenticationActivity extends AppCompatActivity {
         } else {
             finish();
         }
+    }
+
+    private boolean usernameHasUnwantedChars(String username) {
+        Pattern special = Pattern.compile("[!@#$%&*()+=|<>?{}\\[\\]~]");
+        Matcher containsUnwantedChars = special.matcher(username);
+        return containsUnwantedChars.find();
     }
 }

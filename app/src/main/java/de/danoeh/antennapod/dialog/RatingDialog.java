@@ -2,20 +2,21 @@ package de.danoeh.antennapod.dialog;
 
 import android.app.Dialog;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
-import android.net.Uri;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import android.util.Log;
-
-import com.afollestad.materialdialogs.MaterialDialog;
 
 import java.lang.ref.WeakReference;
 import java.util.concurrent.TimeUnit;
 
+import androidx.appcompat.app.AlertDialog;
 import de.danoeh.antennapod.R;
+import de.danoeh.antennapod.core.util.IntentUtils;
 
 public class RatingDialog {
+
+    private RatingDialog(){}
 
     private static final String TAG = RatingDialog.class.getSimpleName();
     private static final int AFTER_DAYS = 7;
@@ -56,14 +57,10 @@ public class RatingDialog {
 
     private static void rateNow() {
         Context context = mContext.get();
-        if(context == null) {
+        if (context == null) {
             return;
         }
-        final String appPackage = "de.danoeh.antennapod";
-        final Uri uri = Uri.parse("https://play.google.com/store/apps/details?id=" + appPackage);
-        Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        context.startActivity(intent);
+        IntentUtils.openInBrowser(context, "https://play.google.com/store/apps/details?id=de.danoeh.antennapod");
         saveRated();
     }
 
@@ -71,7 +68,8 @@ public class RatingDialog {
         return mPreferences.getBoolean(KEY_RATED, false);
     }
 
-    private static void saveRated() {
+    @VisibleForTesting
+    public static void saveRated() {
         mPreferences
                 .edit()
                 .putBoolean(KEY_RATED, true)
@@ -98,21 +96,18 @@ public class RatingDialog {
     }
 
     @Nullable
-    private static MaterialDialog createDialog() {
+    private static AlertDialog createDialog() {
         Context context = mContext.get();
-        if(context == null) {
+        if (context == null) {
             return null;
         }
-        return new MaterialDialog.Builder(context)
-                .title(R.string.rating_title)
-                .content(R.string.rating_message)
-                .positiveText(R.string.rating_now_label)
-                .negativeText(R.string.rating_never_label)
-                .neutralText(R.string.rating_later_label)
-                .onPositive((dialog, which) -> rateNow())
-                .onNegative((dialog, which) -> saveRated())
-                .onNeutral((dialog, which) -> resetStartDate())
-                .cancelListener(dialog1 -> resetStartDate())
-                .build();
+        return new AlertDialog.Builder(context)
+                .setTitle(R.string.rating_title)
+                .setMessage(R.string.rating_message)
+                .setPositiveButton(R.string.rating_now_label, (dialog, which) -> rateNow())
+                .setNegativeButton(R.string.rating_never_label, (dialog, which) -> saveRated())
+                .setNeutralButton(R.string.rating_later_label, (dialog, which) -> resetStartDate())
+                .setOnCancelListener(dialog1 -> resetStartDate())
+                .create();
     }
 }

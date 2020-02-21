@@ -3,7 +3,9 @@ package de.danoeh.antennapod.dialog;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.res.TypedArray;
-import android.support.v4.content.ContextCompat;
+import android.os.Build;
+import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.ContextCompat;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
@@ -15,29 +17,27 @@ import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
 
-import com.afollestad.materialdialogs.DialogAction;
-import com.afollestad.materialdialogs.MaterialDialog;
-import com.afollestad.materialdialogs.internal.MDButton;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.SocketAddress;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.core.preferences.UserPreferences;
 import de.danoeh.antennapod.core.service.download.AntennapodHttpClient;
 import de.danoeh.antennapod.core.service.download.ProxyConfig;
+import io.reactivex.Single;
+import io.reactivex.SingleOnSubscribe;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.schedulers.Schedulers;
 import okhttp3.Credentials;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import rx.Observable;
-import rx.Subscriber;
-import rx.Subscription;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.schedulers.Schedulers;
 
 public class ProxyDialog {
 
@@ -45,7 +45,7 @@ public class ProxyDialog {
 
     private final Context context;
 
-    private MaterialDialog dialog;
+    private AlertDialog dialog;
 
     private Spinner spType;
     private EditText etHost;
@@ -55,77 +55,86 @@ public class ProxyDialog {
 
     private boolean testSuccessful = false;
     private TextView txtvMessage;
-    private Subscription subscription;
+    private Disposable disposable;
 
     public ProxyDialog(Context context) {
         this.context = context;
     }
 
-    public Dialog createDialog() {
-        dialog = new MaterialDialog.Builder(context)
-                .title(R.string.pref_proxy_title)
-                .customView(R.layout.proxy_settings, true)
-                .positiveText(R.string.proxy_test_label)
-                .negativeText(R.string.cancel_label)
-                .onPositive((dialog1, which) -> {
-                    if(!testSuccessful) {
-                        dialog.getActionButton(DialogAction.POSITIVE).setEnabled(false);
-                        test();
-                        return;
-                    }
-                    String type = (String) ((Spinner) dialog1.findViewById(R.id.spType)).getSelectedItem();
-                    ProxyConfig proxy;
-                    if(Proxy.Type.valueOf(type) == Proxy.Type.DIRECT) {
-                        proxy = ProxyConfig.direct();
-                    } else {
-                        String host = etHost.getText().toString();
-                        String port = etPort.getText().toString();
-                        String username = etUsername.getText().toString();
-                        if(TextUtils.isEmpty(username)) {
-                            username = null;
-                        }
-                        String password = etPassword.getText().toString();
-                        if(TextUtils.isEmpty(password)) {
-                            password = null;
-                        }
-                        int portValue = 0;
-                        if(!TextUtils.isEmpty(port)) {
-                            portValue = Integer.valueOf(port);
-                        }
-                        proxy = ProxyConfig.http(host, portValue, username, password);
-                    }
-                    UserPreferences.setProxyConfig(proxy);
-                    AntennapodHttpClient.reinit();
-                    dialog.dismiss();
-                })
-                .onNegative((dialog1, which) -> dialog1.dismiss())
-                .autoDismiss(false)
-                .build();
-        View view = dialog.getCustomView();
-        spType = (Spinner) view.findViewById(R.id.spType);
-        String[] types = { Proxy.Type.DIRECT.name(), Proxy.Type.HTTP.name() };
+    public Dialog show() {
+        View content = View.inflate(context, R.layout.proxy_settings, null);
+        dialog = new AlertDialog.Builder(context)
+                .setTitle(R.string.pref_proxy_title)
+                .setView(content)
+                .setNegativeButton(R.string.cancel_label, null)
+                .setPositiveButton(R.string.proxy_test_label, null)
+                .show();
+        // To prevent cancelling the dialog on button click
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener((view) -> {
+            if (!testSuccessful) {
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
+                test();
+                return;
+            }
+            String type = (String) ((Spinner) content.findViewById(R.id.spType)).getSelectedItem();
+            ProxyConfig proxy;
+            if (Proxy.Type.valueOf(type) == Proxy.Type.DIRECT) {
+                proxy = ProxyConfig.direct();
+            } else {
+                String host = etHost.getText().toString();
+                String port = etPort.getText().toString();
+                String username = etUsername.getText().toString();
+                if(TextUtils.isEmpty(username)) {
+                    username = null;
+                }
+                String password = etPassword.getText().toString();
+                if(TextUtils.isEmpty(password)) {
+                    password = null;
+                }
+                int portValue = 0;
+                if(!TextUtils.isEmpty(port)) {
+                    portValue = Integer.valueOf(port);
+                }
+                if (Proxy.Type.valueOf(type) == Proxy.Type.SOCKS) {
+                    proxy = ProxyConfig.socks(host, portValue, username, password);
+                } else {
+                    proxy = ProxyConfig.http(host, portValue, username, password);
+                }
+            }
+            UserPreferences.setProxyConfig(proxy);
+            AntennapodHttpClient.reinit();
+            dialog.dismiss();
+        });
+
+        spType = content.findViewById(R.id.spType);
+        List<String> types = new ArrayList<>();
+        types.add(Proxy.Type.DIRECT.name());
+        types.add(Proxy.Type.HTTP.name());
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            types.add(Proxy.Type.SOCKS.name());
+        }
         ArrayAdapter<String> adapter = new ArrayAdapter<>(context,
             android.R.layout.simple_spinner_item, types);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spType.setAdapter(adapter);
         ProxyConfig proxyConfig = UserPreferences.getProxyConfig();
         spType.setSelection(adapter.getPosition(proxyConfig.type.name()));
-        etHost = (EditText) view.findViewById(R.id.etHost);
+        etHost = content.findViewById(R.id.etHost);
         if(!TextUtils.isEmpty(proxyConfig.host)) {
             etHost.setText(proxyConfig.host);
         }
         etHost.addTextChangedListener(requireTestOnChange);
-        etPort = (EditText) view.findViewById(R.id.etPort);
+        etPort = content.findViewById(R.id.etPort);
         if(proxyConfig.port > 0) {
             etPort.setText(String.valueOf(proxyConfig.port));
         }
         etPort.addTextChangedListener(requireTestOnChange);
-        etUsername = (EditText) view.findViewById(R.id.etUsername);
+        etUsername = content.findViewById(R.id.etUsername);
         if(!TextUtils.isEmpty(proxyConfig.username)) {
             etUsername.setText(proxyConfig.username);
         }
         etUsername.addTextChangedListener(requireTestOnChange);
-        etPassword = (EditText) view.findViewById(R.id.etPassword);
+        etPassword = content.findViewById(R.id.etPassword);
         if(!TextUtils.isEmpty(proxyConfig.password)) {
             etPassword.setText(proxyConfig.username);
         }
@@ -146,7 +155,7 @@ public class ProxyDialog {
                 enableSettings(false);
             }
         });
-        txtvMessage = (TextView) view.findViewById(R.id.txtvMessage);
+        txtvMessage = content.findViewById(R.id.txtvMessage);
         checkValidity();
         return dialog;
     }
@@ -217,20 +226,18 @@ public class ProxyDialog {
     private void setTestRequired(boolean required) {
         if(required) {
             testSuccessful = false;
-            MDButton button = dialog.getActionButton(DialogAction.POSITIVE);
-            button.setText(context.getText(R.string.proxy_test_label));
-            button.setEnabled(true);
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setText(R.string.proxy_test_label);
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
         } else {
             testSuccessful = true;
-            MDButton button = dialog.getActionButton(DialogAction.POSITIVE);
-            button.setText(context.getText(android.R.string.ok));
-            button.setEnabled(true);
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setText(android.R.string.ok);
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
         }
     }
 
     private void test() {
-        if(subscription != null) {
-            subscription.unsubscribe();
+        if (disposable != null) {
+            disposable.dispose();
         }
         if(!checkValidity()) {
             setTestRequired(true);
@@ -243,7 +250,7 @@ public class ProxyDialog {
         txtvMessage.setTextColor(textColorPrimary);
         txtvMessage.setText("{fa-circle-o-notch spin} " + checking);
         txtvMessage.setVisibility(View.VISIBLE);
-        subscription = Observable.create((Observable.OnSubscribe<Response>) subscriber -> {
+        disposable = Single.create((SingleOnSubscribe<Response>) emitter -> {
             String type = (String) spType.getSelectedItem();
             String host = etHost.getText().toString();
             String port = etPort.getText().toString();
@@ -275,13 +282,12 @@ public class ProxyDialog {
                     .build();
             try {
                 Response response = client.newCall(request).execute();
-                subscriber.onNext(response);
+                emitter.onSuccess(response);
             } catch(IOException e) {
-                subscriber.onError(e);
+                emitter.onError(e);
             }
-            subscriber.onCompleted();
         })
-                .subscribeOn(Schedulers.newThread())
+                .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                         response -> {

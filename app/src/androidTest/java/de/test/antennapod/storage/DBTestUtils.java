@@ -1,7 +1,5 @@
 package de.test.antennapod.storage;
 
-import junit.framework.Assert;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -14,13 +12,15 @@ import de.danoeh.antennapod.core.feed.FeedMedia;
 import de.danoeh.antennapod.core.feed.SimpleChapter;
 import de.danoeh.antennapod.core.storage.PodDBAdapter;
 import de.danoeh.antennapod.core.util.comparator.FeedItemPubdateComparator;
-import de.danoeh.antennapod.core.util.flattr.FlattrStatus;
+
+import static org.junit.Assert.assertTrue;
 
 /**
  * Utility methods for DB* tests.
  */
 class DBTestUtils {
 
+    private DBTestUtils(){}
     /**
      * Use this method when tests don't involve chapters.
      */
@@ -44,8 +44,8 @@ class DBTestUtils {
         PodDBAdapter adapter = PodDBAdapter.getInstance();
         adapter.open();
         for (int i = 0; i < numFeeds; i++) {
-            Feed f = new Feed(0, null, "feed " + i, null, "link" + i, "descr", null, null,
-                    null, null, "id" + i, null, null, "url" + i, false, new FlattrStatus(), false, null, null, false);
+            Feed f = new Feed(0, null, "feed " + i, "link" + i, "descr", null, null,
+                    null, null, "id" + i, null, null, "url" + i, false);
             f.setItems(new ArrayList<>());
             for (int j = 0; j < numItems; j++) {
                 FeedItem item = new FeedItem(0, "item " + j, "id" + j, "link" + j, new Date(),
@@ -58,16 +58,17 @@ class DBTestUtils {
                     List<Chapter> chapters = new ArrayList<>();
                     item.setChapters(chapters);
                     for (int k = 0; k < numChapters; k++) {
-                        chapters.add(new SimpleChapter(k, "item " + j + " chapter " + k, item, "http://example.com"));
+                        chapters.add(new SimpleChapter(k, "item " + j + " chapter " + k,
+                                "http://example.com", "http://example.com/image.png"));
                     }
                 }
                 f.getItems().add(item);
             }
             Collections.sort(f.getItems(), new FeedItemPubdateComparator());
             adapter.setCompleteFeed(f);
-            Assert.assertTrue(f.getId() != 0);
+            assertTrue(f.getId() != 0);
             for (FeedItem item : f.getItems()) {
-                Assert.assertTrue(item.getId() != 0);
+                assertTrue(item.getId() != 0);
             }
             feeds.add(f);
         }
